@@ -248,21 +248,34 @@ if err != clean {
 > A propagation sugar (a `?`-alike) is a likely future addition; it is additive
 > and deferred.
 
-### 3.3 Closures / lambdas
+### 3.3 First-class functions
 
-A lambda is an anonymous `fn` — identical syntax minus the name. Zero new
-tokens, and `return` works identically everywhere. There is no `=>` form in v1
-(it can be added later without breakage, and it would sit uncomfortably close
-to the `->` reactive arrow).
+Functions are values. A lambda is an anonymous `fn` — identical syntax minus
+the name. Zero new tokens, and `return` works identically everywhere. There is
+no `=>` form in v1 (it can be added later without breakage, and it would sit
+uncomfortably close to the `->` reactive arrow).
+
+**Function types** mirror the declaration shape minus name and body:
+`fn(Int) Int`, `fn(Str) (Config, Err)`, `fn(Int)` (returns nothing). Bindings
+require the annotation like everything else — one rule, zero exceptions.
+Argument positions never need annotations (the literal carries its own types).
 
 ```
-let square = fn(x Int) Int { return x * x }
+let square fn(Int) Int = fn(x Int) Int { return x * x }
 
-let doubled = nums.map(fn(n Int) Int { return n * 2 })
-let total = nums.fold(0, fn(acc Int, n Int) Int {
+fn apply(f fn(Int) Int, x Int) Int {
+    return f(x)
+}
+
+let doubled Array<Int> = nums.map(fn(n Int) Int { return n * 2 })
+let total Int = nums.fold(0, fn(acc Int, n Int) Int {
     return acc + n
 })
 ```
+
+**Closures capture by copy** (§7.1: value semantics, no aliasing). Mutating a
+captured `var` inside a closure changes the closure's private copy, invisible
+outside. Shared mutable state wants a process, not a closure.
 
 ---
 
@@ -438,6 +451,37 @@ nums |> double |> show            // a complete, runnable pipeline
 A pipeline expression ending in a sink is a **runnable statement**: executing
 it runs the pipeline to completion (all streams drained and closed) before the
 next statement.
+
+### 4.8 Processes as values
+
+Spawns are first-class, same as functions (§3.3):
+
+- **Process types** mirror the declaration shape: `spawn(Vein<Int>) Vein<Int>`
+  is a transducer, `spawn() Vein<Int>` a source, `spawn(Vein<Int>)` a sink,
+  and `spawn()` a complete pipeline. The worker count (`<8>`/`<auto>`) is an
+  attribute of the definition, not part of the type.
+- **Anonymous spawn literals** work inline, exactly like anonymous `fn`:
+
+  ```
+  nums |> quad |> spawn(input Vein<Int>) {
+      input -> item { print(item) }
+  }
+  ```
+
+- **Partial pipelines are process values.** `|>` composes two compatible
+  processes into a new one; the open ends are the new type. Pipelines are an
+  algebra — fan-out/fan-in helpers and supervisors get built from this.
+
+  ```
+  let quad spawn(Vein<Int>) Vein<Int> = double |> double
+  let job spawn() = nums |> quad |> show
+  job                                   // statement: runs the pipeline
+  ```
+
+- A **complete process value** (`spawn()`) used as an expression statement
+  runs to completion — the §4.7 rule is a special case of this.
+- A spawn literal's **captures are copied into its cell** at creation, the
+  same copy-on-emit rule as everything crossing a process boundary (§7).
 
 > **DEFERRED:** fan-out / fan-in helpers (splitting one stream across N
 > processes and merging results) belong in the **standard library**, built
@@ -626,7 +670,8 @@ same Rust runtime (values, cells, scheduler) is the v1.1 runtime.
 | `ossify`    | themed        | Reserved; no v1 meaning (likely: compile-time consts)          | **reserved**|
 
 Built-in types: `Int`, `Float`, `Str`, `Bool`, `Err`, `Vein<T>`, `Array<T>`,
-`Set<T>`, `Map<K, V>`.
+`Set<T>`, `Map<K, V>`; function types `fn(T, ...) R` / `fn(T, ...) (R1, R2)`;
+process types `spawn(Vein<T>) Vein<U>` (either side omissible — §4.8).
 
 Operators / punctuation:
 
@@ -683,6 +728,18 @@ Resolved (naming and memory sessions, 2026-07-01):
 18. **Implementation language** — Rust, so Autophage is owned rather than
     borrowed from a host GC, and the runtime carries into v1.1 (§7.4).
 
+Resolved (first-class values session, 2026-07-01):
+
+19. **Fn and spawn types** — mirror the declaration shapes minus name and
+    body: `fn(Int) Int`, `spawn(Vein<Int>) Vein<Int>` (§3.3, §4.8).
+20. **Full spawn first-classness** — anonymous spawn literals, partial
+    pipelines as composable process values, complete pipelines as `spawn()`
+    runnable as statements (§4.8).
+21. **Annotations stay mandatory** for fn/spawn-valued bindings — no
+    manifest-type exception (§3.3).
+22. **Closures capture by copy** — forced by value semantics; spawn captures
+    copy into the new cell (§3.3, §4.8).
+
 Deferred (recorded, not blocking):
 
 - Supervision / restart policies for dead stages (§6.4).
@@ -717,6 +774,8 @@ lexers/parsers/ASTs:
    - no mutable cross-item state in parallel processes (§4.5)
    - no construction of entombed types (§2.5)
    - every binding annotated; multi-return arity and types match (§3)
+   - pipeline composition: output stream type of each stage matches the next
+     stage's input; only complete `spawn()` values run as statements (§4.8)
 5. **Tree-walking interpreter** — fastest path to running programs. Defer any
    bytecode VM / real codegen and the CSP scheduler's true parallelism until
    the sequential semantics work end to end.
