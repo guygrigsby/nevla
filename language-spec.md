@@ -50,8 +50,9 @@ Locked decisions:
   each binding in a multi-return destructure (§3.2).
 - **Nominal typing.** Type identity is by name, not shape.
 - **Garbage collected** by **Autophage** (autophagy: the cell consuming its
-  own dead parts). No manual memory management, no ownership/borrow checker in
-  v1. (Manual memory / ownership is explicitly deferred as a possible "second
+  own dead parts) — per-process heaps, value semantics throughout; full design
+  in §7. No manual memory management, no ownership/borrow checker in v1.
+  (Manual memory / ownership is explicitly deferred as a possible "second
   language" or future major version.)
 
 ### 2.1 Primitive types
@@ -542,7 +543,69 @@ can be finished, then reports which process died and why, and exits cleanly.
 
 ---
 
-## 7. Full keyword reference
+## 7. Memory model — Autophage
+
+The concurrency model and the memory model are the same idea: processes are
+cells, and memory belongs to cells.
+
+### 7.1 Everything is a value
+
+Assignment, parameter passing, construction, and `emit` all have **copy
+semantics**. Mutating through a `var` binding affects that binding's value and
+nothing else; a `fn` that mutates a parameter changes its own local copy.
+There are **no pointers, no references, no address-of, and no aliasing**
+anywhere in the language.
+
+Because nothing aliases, copy-vs-share is unobservable for immutable data.
+The implementation exploits this: values are refcounted and copied lazily
+(copy-on-write), so "copy" costs nothing until a shared value is actually
+mutated.
+
+When shared mutable state is genuinely needed — a cache, a counter, a
+registry — the mechanism is a **stateful sequential `spawn` process** holding
+it, with other processes talking to it through streams. Processes are the
+language's replacement for pointers, and the checker's rules (§4.5) make them
+race-free.
+
+### 7.2 Per-process cells
+
+Each `spawn` process owns its own heap — its **cell**:
+
+- `emit` copies the value across the rendezvous; no cross-process references
+  can exist. GC is therefore process-local: no global pauses, and parallel
+  workers (`spawn<N>`) share nothing.
+- Within a living cell, memory is reclaimed by reference counting.
+- When a process ends or dies, its entire cell is reclaimed at once —
+  **apoptosis is arena reclamation**. Autophage digests the dead cell whole,
+  including any reference cycles inside it.
+
+This is Erlang's memory model (per-process heaps, copy on send, reclaim on
+death) wearing the theme it always deserved.
+
+### 7.3 Cycles and recursive types
+
+Recursive `genesis` types are legal (`genesis Node { children Array<Node> }`).
+With no nil and mandatory initialization, a struct cannot directly contain
+itself — but mutable collections can close a loop (`n.children.push(n)`).
+The ceiling: a cycle inside a long-lived process leaks until that process
+dies, at which point cell reclamation frees it anyway. Bounded and documented;
+a per-cell tracing collector is future work if real programs hit it.
+
+> **V1 implementation note:** the tree-walking interpreter approximates cells
+> with refcounting + copy-on-write (`Arc`), which honors all observable
+> semantics but reclaims cycles only at program exit, not process death.
+> True arena-backed cells arrive with the owned runtime in v1.1.
+
+### 7.4 Implementation language
+
+The interpreter and runtime are written in **Rust**: Autophage must be built,
+not borrowed, and a host language with its own GC underneath (Go, JVM) would
+mean two collectors and a runtime that can't carry into v1.1 compilation. The
+same Rust runtime (values, cells, scheduler) is the v1.1 runtime.
+
+---
+
+## 8. Full keyword reference
 
 | Keyword     | Category      | Meaning                                                        | Status      |
 |-------------|---------------|----------------------------------------------------------------|-------------|
@@ -581,7 +644,7 @@ Operators / punctuation:
 
 ---
 
-## 8. Decision log
+## 9. Decision log
 
 Resolved (second design session, 2026-07-01):
 
@@ -608,6 +671,18 @@ Resolved (second design session, 2026-07-01):
 13. **ossify** — reserved, no v1 meaning (§2.7).
 14. **Generics** — built-ins only in v1 (§2.6).
 
+Resolved (naming and memory sessions, 2026-07-01):
+
+15. **Names** — the language and CLI are **ichor**; the garbage collector is
+    **Autophage**; `sanguine` retired (header).
+16. **Memory model** — value semantics everywhere, no pointers or aliasing;
+    Autophage is per-process cells with copy-on-emit, refcounting within a
+    living cell, whole-cell reclamation on death (§7).
+17. **Recursive genesis types** — legal; in-cell cycles leak only until
+    process death (§7.3).
+18. **Implementation language** — Rust, so Autophage is owned rather than
+    borrowed from a host GC, and the runtime carries into v1.1 (§7.4).
+
 Deferred (recorded, not blocking):
 
 - Supervision / restart policies for dead stages (§6.4).
@@ -620,14 +695,18 @@ Deferred (recorded, not blocking):
 - Spread / functional-update syntax (§2.3).
 - Inclusive range spelling (§5).
 - `ossify` as compile-time constants (§2.7).
+- Per-cell tracing collector for in-cell cycles (§7.3).
+- True arena-backed cells in the interpreter (v1 approximates with
+  refcount + copy-on-write; §7.3 note).
 
 ---
 
-## 9. Suggested implementation path
+## 10. Suggested implementation path
 
-Standard, and matches the interest in lexers/parsers/ASTs:
+In Rust (§7.4), stdlib only. Standard shape, and matches the interest in
+lexers/parsers/ASTs:
 
-1. **Lexer** — tokenize the keyword set (§7) plus literals, identifiers,
+1. **Lexer** — tokenize the keyword set (§8) plus literals, identifiers,
    operators. Hand-written recommended over a generator for a first pass.
 2. **Parser** — recursive descent; Pratt parsing for expression precedence.
 3. **AST** — node types per construct (`GenesisNode`, `SpawnNode`, `FnNode`,
@@ -642,9 +721,17 @@ Standard, and matches the interest in lexers/parsers/ASTs:
    bytecode VM / real codegen and the CSP scheduler's true parallelism until
    the sequential semantics work end to end.
 
+**Version plan:** v1 is the tree-walking interpreter, complete against this
+spec. v1.1 moves to compilation (backend picked when v1 works — bytecode VM or
+native). The lexer, parser, AST, and checker are shared across both; only the
+execution layer is replaced.
+
+Concurrency mapping: one OS thread per process, `sync_channel(0)` for the
+CSP rendezvous — the std library is the scheduler in v1.
+
 Reference reading: *Crafting Interpreters* (Nystrom) for the lexer→parser→
 tree-walking-interpreter path; *Writing an Interpreter in Go* (Ball) for a
-code-forward companion.
+code-forward companion (the shape ports directly to Rust).
 
 > **Implementation note on concurrency:** get the **sequential** `spawn`
 > semantics (ordered, single worker, stateful) working first as an ordinary
