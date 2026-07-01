@@ -5,8 +5,9 @@
 > implementation. It is the starting point for a first implementation
 > (lexer → parser → AST → type checker → tree-walking interpreter).
 >
-> Working codename: *(undecided — `sanguine` used informally for the CLI tooling;
-> candidate names in `possible-names.md`)*
+> Name: **ichor** — the blood of the gods; what flows through a `Vein<T>`.
+> CLI is also `ichor` (retires the informal `sanguine` tooling name).
+> The garbage collector is **Autophage** — the runtime consuming its own dead.
 > Reference program to eventually build in the language: **eviscerOS**.
 
 ---
@@ -48,9 +49,10 @@ Locked decisions:
   return position carries an explicit type. No inference in v1. This includes
   each binding in a multi-return destructure (§3.2).
 - **Nominal typing.** Type identity is by name, not shape.
-- **Garbage collected.** No manual memory management, no ownership/borrow
-  checker in v1. (Manual memory / ownership is explicitly deferred as a possible
-  "second language" or future major version.)
+- **Garbage collected** by **Autophage** (autophagy: the cell consuming its
+  own dead parts). No manual memory management, no ownership/borrow checker in
+  v1. (Manual memory / ownership is explicitly deferred as a possible "second
+  language" or future major version.)
 
 ### 2.1 Primitive types
 

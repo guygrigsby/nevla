@@ -1,4 +1,4 @@
-autophage - eating one's self (actual term for cells eating themselves)
+autophage - eating one's self (actual term for cells eating themselves) **CHOSEN: the garbage collector**
 brephophage - eater of newborns
 clot
 compleat - phyrexian term for the process of converting an organic being into a phyrexian; part flesh, part machine.
@@ -9,7 +9,7 @@ flay
 hemophage
 hemorite
 host
-ichor
+ichor **CHOSEN: the language (and CLI)**
 ossuary
 philocide - love killing
 sanguiphage
