@@ -162,7 +162,9 @@ impl Parser {
                 while self.peek() != Some(&Token::RBrace) {
                     let f = self.ident("field name")?;
                     if self.peek() == Some(&Token::Colon) {
-                        return Err(self.err_here("fields are declared Go style: name type, no colon"));
+                        return Err(
+                            self.err_here("fields are declared Go style: name type, no colon")
+                        );
                     }
                     let ty = self.type_expr()?;
                     fields.push((f, ty));
@@ -675,8 +677,8 @@ impl Parser {
         let mut kwargs: Vec<(String, Expr)> = vec![];
         while self.peek() != Some(&Token::RParen) {
             // `name: value` is a named argument (python calls only)
-            let named = matches!(self.peek(), Some(Token::Ident(_)))
-                && self.peek2() == Some(&Token::Colon);
+            let named =
+                matches!(self.peek(), Some(Token::Ident(_))) && self.peek2() == Some(&Token::Colon);
             if named {
                 let name = self.ident("argument name")?;
                 self.bump(); // the colon
@@ -684,9 +686,7 @@ impl Parser {
                 kwargs.push((name, self.expr(true)?));
             } else {
                 if !kwargs.is_empty() {
-                    return Err(
-                        self.err_here("positional arguments cannot follow named arguments")
-                    );
+                    return Err(self.err_here("positional arguments cannot follow named arguments"));
                 }
                 args.push(self.expr(true)?);
             }
@@ -742,7 +742,9 @@ impl Parser {
                 if self.peek2() == Some(&Token::RBracket) {
                     let type_follows = matches!(
                         self.toks.get(self.pos + 2).map(|s| &s.node),
-                        Some(Token::Ident(_)) | Some(Token::Py) | Some(Token::Fn)
+                        Some(Token::Ident(_))
+                            | Some(Token::Py)
+                            | Some(Token::Fn)
                             | Some(Token::LBracket)
                     );
                     if type_follows {

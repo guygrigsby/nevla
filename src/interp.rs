@@ -703,7 +703,11 @@ impl<'p> Interp<'p> {
                 }
                 self.binop(*op, l, r).map(Ev::V)
             }
-            K::Call { callee, args, kwargs } => {
+            K::Call {
+                callee,
+                args,
+                kwargs,
+            } => {
                 let mut vals = vec![];
                 // builtins by bare name, unless shadowed
                 if let K::Ident(name) = &callee.kind {
@@ -735,7 +739,12 @@ impl<'p> Interp<'p> {
                 }
                 self.call_value(&f, vals).map(Ev::V)
             }
-            K::Method { recv, name, args, kwargs } => {
+            K::Method {
+                recv,
+                name,
+                args,
+                kwargs,
+            } => {
                 // error.new / error.wrap
                 if let K::Ident(id) = &recv.kind {
                     let shadowed = self.scopes.iter().rev().any(|s| s.contains_key(id));

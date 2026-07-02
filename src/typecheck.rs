@@ -871,12 +871,21 @@ impl Checker {
                     one(t)
                 }
             }
-            K::Call { callee, args, kwargs } => {
+            K::Call {
+                callee,
+                args,
+                kwargs,
+            } => {
                 let ty = self.call(callee, args, line, col);
                 self.check_kwargs(kwargs, &ty, line, col);
                 ty
             }
-            K::Method { recv, name, args, kwargs } => {
+            K::Method {
+                recv,
+                name,
+                args,
+                kwargs,
+            } => {
                 let ty = self.method(recv, name, args, line, col);
                 self.check_kwargs(kwargs, &ty, line, col);
                 ty
@@ -1437,11 +1446,7 @@ impl Checker {
             (List(elem), "sum") => {
                 self.check_args(&[], args, line, col);
                 if !matches!(**elem, Int | Float | Unknown) {
-                    self.diag(
-                        line,
-                        col,
-                        format!("sum needs []int or []float, got {recv}"),
-                    );
+                    self.diag(line, col, format!("sum needs []int or []float, got {recv}"));
                 }
                 one((**elem).clone())
             }

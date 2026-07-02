@@ -321,6 +321,9 @@ mod tests {
         let v = super::embedded_python();
         let parts: Vec<&str> = v.split('.').collect();
         assert_eq!(parts.len(), 2, "{v}");
-        assert!(parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())), "{v}");
+        assert!(
+            parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())),
+            "{v}"
+        );
     }
 }

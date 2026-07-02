@@ -241,7 +241,12 @@ fn program_args_and_input() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    child.stdin.as_mut().unwrap().write_all(b"hello\nworld\n").unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"hello\nworld\n")
+        .unwrap();
     let out = child.wait_with_output().unwrap();
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -281,7 +286,11 @@ fn http_stream_lines_reach_handler() {
         .arg(format!("http://{addr}/"))
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("got one\n"), "{stdout}");
     assert!(stdout.contains("got two\n"), "{stdout}");

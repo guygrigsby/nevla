@@ -61,9 +61,7 @@ fn golden() {
         } else if err_f.exists() {
             let want = fs::read_to_string(&err_f).unwrap();
             let got = match &res.exit {
-                rikki::ExitKind::CompileError(m) | rikki::ExitKind::RuntimeError(m) => {
-                    m.clone()
-                }
+                rikki::ExitKind::CompileError(m) | rikki::ExitKind::RuntimeError(m) => m.clone(),
                 rikki::ExitKind::Ok => String::new(),
             };
             want.lines()

@@ -39,9 +39,9 @@ enum PyCmd {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Run { file, args } => {
-            with_entry(file, |f| rikki::report(rikki::run_with(f, args.clone(), true)))
-        }
+        Cmd::Run { file, args } => with_entry(file, |f| {
+            rikki::report(rikki::run_with(f, args.clone(), true))
+        }),
         Cmd::Check { file } => with_entry(file, |f| rikki::report(rikki::check_source(f))),
         Cmd::Py {
             cmd: PyCmd::Add { package },

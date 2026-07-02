@@ -200,7 +200,10 @@ fn stream(interp: &mut Interp, args: Vec<Value>) -> Result<Value, Fault> {
     fields.insert("body".to_string(), Value::Str(full));
     fields.insert("headers".to_string(), Value::Map(headers));
     Ok(Value::Tuple(vec![
-        Value::Struct { name: "Response".into(), fields },
+        Value::Struct {
+            name: "Response".into(),
+            fields,
+        },
         Value::NoneV,
     ]))
 }

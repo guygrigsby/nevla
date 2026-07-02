@@ -50,7 +50,10 @@ impl Interp<'_> {
                 match std::io::stdin().lock().read_line(&mut line) {
                     Ok(0) => Ok(Value::Tuple(vec![
                         Value::Str(String::new()),
-                        Value::Err(ErrVal { msg: "eof".into(), ..Default::default() }),
+                        Value::Err(ErrVal {
+                            msg: "eof".into(),
+                            ..Default::default()
+                        }),
                     ])),
                     Ok(_) => {
                         let line = line.trim_end_matches(['\n', '\r']).to_string();
@@ -58,7 +61,10 @@ impl Interp<'_> {
                     }
                     Err(e) => Ok(Value::Tuple(vec![
                         Value::Str(String::new()),
-                        Value::Err(ErrVal { msg: format!("stdin: {e}"), ..Default::default() }),
+                        Value::Err(ErrVal {
+                            msg: format!("stdin: {e}"),
+                            ..Default::default()
+                        }),
                     ])),
                 }
             }

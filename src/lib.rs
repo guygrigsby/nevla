@@ -128,8 +128,7 @@ fn compile_and(path: &Path, run: bool, args: Vec<String>, stream: bool) -> RunRe
                     proj.python
                 ));
             }
-            let provision =
-                run && (!proj.py_deps.is_empty() || root.join("rikki.lock").exists());
+            let provision = run && (!proj.py_deps.is_empty() || root.join("rikki.lock").exists());
             if provision {
                 if let Err(e) = proj.ensure_env("uv") {
                     return compile_err(e);
