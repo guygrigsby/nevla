@@ -1,6 +1,6 @@
 # 2. CSP stream processes as the core primitive
 
-Status: accepted (2026-07-01)
+Status: accepted (2026-07-01); amended by 0008 (parallelism cut, `Vein<T>` renamed `Stream<T>`)
 
 ## Context
 

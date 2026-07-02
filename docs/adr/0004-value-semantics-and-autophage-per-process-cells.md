@@ -1,6 +1,6 @@
 # 4. Value semantics and Autophage per-process cells
 
-Status: accepted (2026-07-01)
+Status: superseded by 0008 (2026-07-01); value semantics survives as an implementation posture
 
 ## Context
 

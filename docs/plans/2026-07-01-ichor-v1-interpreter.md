@@ -1,5 +1,10 @@
 # ichor v1 Interpreter Implementation Plan
 
+> **SUPERSEDED (2026-07-01):** targets the pre-simplification spec (theme,
+> mortality, parallelism, multi-return — all cut by ADR 0008). Do not
+> execute. A new plan will be written against the simplified
+> `language-spec.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A complete tree-walking interpreter for ichor per `language-spec.md`, runnable as `ichor run file.ich`.

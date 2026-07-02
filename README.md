@@ -1,27 +1,26 @@
 # ichor
 
-A statically-typed, garbage-collected programming language where **CSP stream
-processes are the central primitive** and **the program cannot crash**.
-Processes are cells: they're born (`spawn`), they transform streams
-(`Vein<T>`), and they die (`cide`) without taking the organism down. The
-garbage collector is **Autophage**: per-process heaps, reclaimed whole when
-the cell dies.
+A small statically-typed language where **CSP stream processes are the
+central primitive**. A `spawn` is a stream transducer: it consumes a
+`Stream<T>`, emits zero, one, or many values per input item, and composes
+into pipelines with `|>`. Everything else is deliberately plain.
 
-Status: **design complete, implementation not started.** The tree-walking
-interpreter (v1, Rust) is fully planned; compilation is v1.1.
+Status: **design complete (simplified core, ADR 0008), implementation not
+started.** Tree-walking interpreter (v1, Rust, zero deps) first;
+compilation is v1.1.
 
 ```
-genesis Vessel {
+type Vessel {
     name Str
     capacity Int
 }
 
-spawn vessels() Vein<Vessel> {
+spawn vessels() Stream<Vessel> {
     emit Vessel { name "cup", capacity 100 }
     emit Vessel { name "jug", capacity 500 }
 }
 
-spawn fill(input Vein<Vessel>) Vein<Vessel> {
+spawn big(input Stream<Vessel>) Stream<Vessel> {
     input -> v {
         if v.capacity >= 200 {
             emit v
@@ -29,27 +28,26 @@ spawn fill(input Vein<Vessel>) Vein<Vessel> {
     }
 }
 
-spawn show(input Vein<Vessel>) {
+spawn show(input Stream<Vessel>) {
     input -> v {
         print(v.name)
     }
 }
 
-vessels |> fill |> show
+vessels |> big |> show
 ```
 
-## The three load-bearing ideas
+## The load-bearing idea
 
-1. **Signatures tell the whole truth.** No exceptions, no panic, no invisible
-   control flow. A `fn` that can fail returns `(T, Err)`; a `fn` that doesn't
-   cannot fail, period.
-2. **Death is process-scoped.** `cide` (and machine faults like divide by
-   zero) kill the enclosing `spawn` process — its stream closes, the pipeline
-   drains, the program reports and continues. Nothing crashes the program
-   from inside the language.
-3. **The memory model is the concurrency model.** Value semantics everywhere,
-   no pointers, no aliasing. Each process owns its heap; `emit` copies across
-   the rendezvous; process death reclaims the whole cell (apoptosis).
+Variable emit count makes one primitive cover filter, map, flatMap, scan,
+batch, and window. Channels are implicit rendezvous; sources and sinks are
+structural (no input param / no return slot); processes are first-class
+values, so partial pipelines compose like functions.
+
+A first, larger design added themed keywords, process mortality ("the
+program cannot crash"), opt-in parallelism, and a named per-process GC.
+All cut — see `docs/adr/0008-simplify-to-minimal-core.md`. Anything
+unexpected now just panics.
 
 ## Repo map
 
@@ -57,12 +55,8 @@ vessels |> fill |> show
 |---|---|
 | `language-spec.md` | The spec — source of truth, includes the append-only decision log |
 | `docs/adr/` | Architectural decision records (append-only) |
-| `docs/design-rationale.md` | Why each major decision went the way it did, what was rejected, known weaknesses |
-| `docs/plans/2026-07-01-ichor-v1-interpreter.md` | The v1 implementation plan (17 TDD tasks, Rust, zero deps) |
-| `possible-names.md` | Naming candidates; ichor and Autophage chosen |
+| `docs/design-rationale.md` | Why the simplified core looks the way it does; known weaknesses |
+| `docs/plans/` | Implementation plans (the 17-task plan is superseded; new plan pending) |
+| `possible-names.md` | Naming candidates from the first design |
 
-## Naming
-
-*Ichor* is the blood of the gods — what flows through a `Vein<T>`. *Autophage*
-is the cell that consumes its own dead parts. Reference program to eventually
-build: eviscerOS. CLI: `ichor run file.ich`.
+CLI: `ichor run file.ich`.

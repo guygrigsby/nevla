@@ -1,6 +1,6 @@
 # 1. Themed keywords rationed by semantic weight
 
-Status: accepted (2026-07-01)
+Status: superseded by 0008 (2026-07-01)
 
 ## Context
 

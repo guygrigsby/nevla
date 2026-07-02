@@ -1,6 +1,6 @@
 # 5. Implementation language: Rust
 
-Status: accepted (2026-07-01)
+Status: accepted (2026-07-01); rationale weakened by 0008, decision stands
 
 ## Context
 

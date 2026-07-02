@@ -1,6 +1,6 @@
 # 3. Process-scoped mortality; the program cannot crash
 
-Status: accepted (2026-07-01)
+Status: superseded by 0008 (2026-07-01)
 
 ## Context
 
