@@ -8,8 +8,6 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
   indexing, conversions.
 - `mongoose fmt`. One true style, needs a lossless formatter.
 - Repl typechecking (currently unchecked).
-- Diagnostics lack filenames in multi-file programs; line:col alone forces a
-  grep across modules. Thread the origin file through the loader into Diag.
 - Nested py chains as call arguments require an inner `check`
   (`f(check g())`); pervasive in torch code. Consider letting an enclosing py
   call absorb argument-chain fallibility.

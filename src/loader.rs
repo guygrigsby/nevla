@@ -24,6 +24,7 @@ fn errd(msg: String) -> Diag {
         msg,
         line: 1,
         col: 1,
+        file: None,
     }
 }
 
@@ -55,7 +56,14 @@ fn load_file(
     }
     let src = std::fs::read_to_string(&canon)
         .map_err(|e| errd(format!("cannot read import {}: {e}", path.display())))?;
-    let mut prog = parser::parse(&src)?;
+    let fname = canon.file_name().map(|n| n.to_string_lossy().to_string());
+    let mut prog = parser::parse(&src).map_err(|mut d| {
+        d.file = fname.clone();
+        d
+    })?;
+    for d in &mut prog.decls {
+        d.set_file(fname.clone());
+    }
 
     loading.push(canon.clone());
     let dir = canon.parent().map(Path::to_path_buf).unwrap_or_default();

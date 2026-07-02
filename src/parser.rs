@@ -70,6 +70,7 @@ impl Parser {
             msg: msg.into(),
             line,
             col,
+            file: None,
         }
     }
 
@@ -149,6 +150,7 @@ impl Parser {
                         py,
                         line,
                         col,
+                        file: None,
                     }),
                     _ => Err(self.err_here("expected import path string")),
                 }
@@ -179,6 +181,7 @@ impl Parser {
                     fields,
                     line,
                     col,
+                    file: None,
                 })
             }
             Some(Token::Fn) => {
@@ -194,6 +197,7 @@ impl Parser {
                     body,
                     line,
                     col,
+                    file: None,
                 }))
             }
             _ => Err(self.err_here("expected fn, struct, or import")),
@@ -1032,13 +1036,15 @@ mod tests {
                     path: "http".into(),
                     py: false,
                     line: 1,
-                    col: 1
+                    col: 1,
+                    file: None
                 },
                 Decl::Import {
                     path: "torch".into(),
                     py: true,
                     line: 2,
-                    col: 1
+                    col: 1,
+                    file: None
                 },
             ]
         );

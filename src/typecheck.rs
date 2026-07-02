@@ -39,6 +39,7 @@ struct Checker {
     imports: HashMap<String, ImportKind>,
     scopes: Vec<Scope>,
     current_ret: Vec<Type>,
+    current_file: Option<String>,
     loop_depth: u32,
     diags: Vec<Diag>,
 }
@@ -106,6 +107,7 @@ impl Checker {
             msg: msg.into(),
             line,
             col,
+            file: self.current_file.clone(),
         });
     }
 
@@ -113,13 +115,7 @@ impl Checker {
 
     fn collect(&mut self, prog: &Program) {
         for d in &prog.decls {
-            if let Decl::Import {
-                path,
-                py,
-                line: _,
-                col: _,
-            } = d
-            {
+            if let Decl::Import { path, py, .. } = d {
                 if *py {
                     self.imports.insert(path.clone(), ImportKind::Py);
                 } else if STD_MODULES.contains(&path.as_str()) {
@@ -158,6 +154,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
+            self.current_file = d.file().cloned();
             if let Decl::Struct {
                 name, line, col, ..
             } = d
@@ -170,11 +167,13 @@ impl Checker {
             }
         }
         for d in &prog.decls {
+            self.current_file = d.file().cloned();
             if let Decl::Struct {
                 name,
                 fields,
                 line,
                 col,
+                ..
             } = d
             {
                 let fs: Vec<(String, Type)> = fields
@@ -187,6 +186,7 @@ impl Checker {
         // a by-value field cycle can never be constructed; an option, list,
         // or map along the way breaks the cycle
         for d in &prog.decls {
+            self.current_file = d.file().cloned();
             if let Decl::Struct {
                 name, line, col, ..
             } = d
@@ -212,6 +212,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
+            self.current_file = d.file().cloned();
             if let Decl::Fn(f) = d {
                 let mut params = vec![];
                 for p in &f.params {
@@ -236,11 +237,13 @@ impl Checker {
         // second import pass: a path that isn't stdlib or py is a file import
         // if the merged program has symbols under its namespace
         for d in &prog.decls {
+            self.current_file = d.file().cloned();
             if let Decl::Import {
                 path,
                 py: false,
                 line,
                 col,
+                ..
             } = d
             {
                 if STD_MODULES.contains(&path.as_str()) {
@@ -397,6 +400,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
+            self.current_file = d.file().cloned();
             if let Decl::Fn(f) = d {
                 self.check_fn(f);
             }

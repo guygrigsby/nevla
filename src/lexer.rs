@@ -53,6 +53,7 @@ impl<'a> Lexer<'a> {
             msg: msg.into(),
             line,
             col,
+            file: None,
         }
     }
 

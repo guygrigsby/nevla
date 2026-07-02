@@ -158,6 +158,7 @@ pub struct FnDecl {
     pub body: Block,
     pub line: u32,
     pub col: u32,
+    pub file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -168,13 +169,32 @@ pub enum Decl {
         fields: Vec<(String, TypeExpr)>,
         line: u32,
         col: u32,
+        file: Option<String>,
     },
     Import {
         path: String,
         py: bool,
         line: u32,
         col: u32,
+        file: Option<String>,
     },
+}
+
+impl Decl {
+    /// Source file name, stamped by the loader after parsing.
+    pub fn file(&self) -> Option<&String> {
+        match self {
+            Decl::Fn(f) => f.file.as_ref(),
+            Decl::Struct { file, .. } | Decl::Import { file, .. } => file.as_ref(),
+        }
+    }
+
+    pub fn set_file(&mut self, name: Option<String>) {
+        match self {
+            Decl::Fn(f) => f.file = name,
+            Decl::Struct { file, .. } | Decl::Import { file, .. } => *file = name,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
