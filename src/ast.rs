@@ -179,10 +179,10 @@ pub enum Decl {
 
 impl Decl {
     /// Source file name, stamped by the loader after parsing.
-    pub fn file(&self) -> Option<&String> {
+    pub fn file(&self) -> Option<&str> {
         match self {
-            Decl::Fn(f) => f.file.as_ref(),
-            Decl::Struct { file, .. } | Decl::Import { file, .. } => file.as_ref(),
+            Decl::Fn(f) => f.file.as_deref(),
+            Decl::Struct { file, .. } | Decl::Import { file, .. } => file.as_deref(),
         }
     }
 

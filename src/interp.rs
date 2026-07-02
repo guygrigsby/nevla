@@ -33,6 +33,7 @@ impl Out {
     }
 }
 
+#[derive(Debug)]
 pub struct Fault {
     pub msg: String,
     pub stack: Vec<String>,

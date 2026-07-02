@@ -48,6 +48,10 @@ pub fn init(venv: Option<&Path>) {
                 } else {
                     format!("{}:{existing}", paths.join(":"))
                 };
+                // edition 2024 makes set_var unsafe (concurrent getenv is
+                // UB on POSIX); safe today because init runs before the
+                // interp and ctrlc threads read the environment. On the
+                // edition bump, pass the path via PyConfig instead.
                 std::env::set_var("PYTHONPATH", joined);
             }
         }

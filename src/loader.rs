@@ -15,7 +15,7 @@ pub fn load(path: &Path) -> Result<Program, Diag> {
     let mut loading = vec![];
     let mut loaded = HashSet::new();
     let mut merged = Program::default();
-    load_file(path, true, &mut loading, &mut loaded, &mut merged)?;
+    load_file(path, FileRole::Root, &mut loading, &mut loaded, &mut merged)?;
     Ok(merged)
 }
 
@@ -27,9 +27,16 @@ fn errd(msg: String) -> Diag {
     }
 }
 
+/// The entry file keeps its names; imported files get namespaced.
+#[derive(Clone, Copy, PartialEq)]
+enum FileRole {
+    Root,
+    Imported,
+}
+
 fn load_file(
     path: &Path,
-    is_root: bool,
+    role: FileRole,
     loading: &mut Vec<PathBuf>,
     loaded: &mut HashSet<PathBuf>,
     merged: &mut Program,
@@ -72,14 +79,14 @@ fn load_file(
         } = d
         {
             if p.ends_with(".rk") {
-                load_file(&dir.join(p), false, loading, loaded, merged)?;
+                load_file(&dir.join(p), FileRole::Imported, loading, loaded, merged)?;
             }
         }
     }
     loading.pop();
     loaded.insert(canon.clone());
 
-    if !is_root {
+    if role == FileRole::Imported {
         let stem = canon
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())

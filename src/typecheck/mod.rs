@@ -85,7 +85,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
-            self.current_file = d.file().cloned();
+            self.current_file = d.file().map(str::to_string);
             if let Decl::Struct { name, span, .. } = d {
                 if self.structs.contains_key(name) {
                     self.diag(*span, format!("duplicate struct: {name}"));
@@ -95,7 +95,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
-            self.current_file = d.file().cloned();
+            self.current_file = d.file().map(str::to_string);
             if let Decl::Struct {
                 name, fields, span, ..
             } = d
@@ -110,7 +110,7 @@ impl Checker {
         // a by-value field cycle can never be constructed; an option, list,
         // or map along the way breaks the cycle
         for d in &prog.decls {
-            self.current_file = d.file().cloned();
+            self.current_file = d.file().map(str::to_string);
             if let Decl::Struct { name, span, .. } = d {
                 let cycle =
                     self.structs
@@ -132,7 +132,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
-            self.current_file = d.file().cloned();
+            self.current_file = d.file().map(str::to_string);
             if let Decl::Fn(f) = d {
                 let mut params = vec![];
                 for p in &f.params {
@@ -153,7 +153,7 @@ impl Checker {
         // second import pass: a path that isn't stdlib or py is a file import
         // if the merged program has symbols under its namespace
         for d in &prog.decls {
-            self.current_file = d.file().cloned();
+            self.current_file = d.file().map(str::to_string);
             if let Decl::Import {
                 path,
                 py: false,
@@ -315,7 +315,7 @@ impl Checker {
             }
         }
         for d in &prog.decls {
-            self.current_file = d.file().cloned();
+            self.current_file = d.file().map(str::to_string);
             if let Decl::Fn(f) = d {
                 self.check_fn(f);
             }

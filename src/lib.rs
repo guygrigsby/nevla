@@ -17,6 +17,21 @@ pub mod value;
 
 use std::path::Path;
 
+/// Run the program after checking, or stop at the check.
+#[derive(Clone, Copy, PartialEq)]
+enum Mode {
+    Check,
+    Run,
+}
+
+/// Buffer stdout into RunResult (tests, run_source) or stream it live
+/// (interactive CLI).
+#[derive(Clone, Copy, PartialEq)]
+enum Output {
+    Buffered,
+    Streamed,
+}
+
 #[derive(Debug)]
 pub enum ExitKind {
     Ok,
@@ -24,6 +39,7 @@ pub enum ExitKind {
     RuntimeError(String),
 }
 
+#[derive(Debug)]
 pub struct RunResult {
     pub stdout: String,
     pub exit: ExitKind,
@@ -36,8 +52,13 @@ pub fn run_source(path: &Path) -> RunResult {
 /// Run with program arguments; `stream` writes stdout live (interactive CLI)
 /// instead of buffering into RunResult.
 pub fn run_with(path: &Path, args: Vec<String>, stream: bool) -> RunResult {
+    let out = if stream {
+        Output::Streamed
+    } else {
+        Output::Buffered
+    };
     let path = path.to_path_buf();
-    on_interp_thread(move || compile_and(&path, true, args, stream))
+    on_interp_thread(move || compile_and(&path, Mode::Run, args, out))
 }
 
 /// Run under the panic net: a dedicated big-stack thread (the interpreter's
@@ -99,7 +120,7 @@ pub fn resolve_entry(file: Option<std::path::PathBuf>) -> Result<std::path::Path
 /// Typecheck only; never provisions an environment or runs code.
 pub fn check_source(path: &Path) -> RunResult {
     let path = path.to_path_buf();
-    on_interp_thread(move || compile_and(&path, false, vec![], false))
+    on_interp_thread(move || compile_and(&path, Mode::Check, vec![], Output::Buffered))
 }
 
 fn compile_err(msg: impl Into<String>) -> RunResult {
@@ -109,7 +130,7 @@ fn compile_err(msg: impl Into<String>) -> RunResult {
     }
 }
 
-fn compile_and(path: &Path, run: bool, args: Vec<String>, stream: bool) -> RunResult {
+fn compile_and(path: &Path, mode: Mode, args: Vec<String>, out: Output) -> RunResult {
     if !path.exists() {
         return compile_err(format!("{}: no such file", path.display()));
     }
@@ -139,7 +160,8 @@ fn compile_and(path: &Path, run: bool, args: Vec<String>, stream: bool) -> RunRe
                     proj.python
                 ));
             }
-            let provision = run && (!proj.py_deps.is_empty() || root.join("rikki.lock").exists());
+            let provision =
+                mode == Mode::Run && (!proj.py_deps.is_empty() || root.join("rikki.lock").exists());
             if provision {
                 if let Err(e) = proj.ensure_env("uv") {
                     return compile_err(e);
@@ -165,7 +187,7 @@ fn compile_and(path: &Path, run: bool, args: Vec<String>, stream: bool) -> RunRe
             .join("\n");
         return compile_err(msg);
     }
-    if !run {
+    if mode == Mode::Check {
         return RunResult {
             stdout: String::new(),
             exit: ExitKind::Ok,
@@ -173,7 +195,7 @@ fn compile_and(path: &Path, run: bool, args: Vec<String>, stream: bool) -> RunRe
     }
     let mut interp = interp::Interp::new(&prog);
     interp.set_args(args);
-    if stream {
+    if out == Output::Streamed {
         interp.stream_stdout();
     }
     let result = interp.run_main();
