@@ -13,8 +13,6 @@ pub struct Project {
     pub py_deps: BTreeMap<String, String>,
 }
 
-pub const DEFAULT_PYTHON: &str = "3.12";
-
 impl Project {
     /// Walk up from `start` to the nearest directory holding mongoose.toml.
     pub fn find(start: &Path) -> Option<PathBuf> {
@@ -49,8 +47,8 @@ impl Project {
             .get("project")
             .and_then(|p| p.get("python"))
             .and_then(|v| v.as_str())
-            .unwrap_or(DEFAULT_PYTHON)
-            .to_string();
+            .map(str::to_string)
+            .unwrap_or_else(crate::bridge::embedded_python);
         let mut py_deps = BTreeMap::new();
         if let Some(deps) = doc.get("py-deps").and_then(|v| v.as_table()) {
             for (k, v) in deps {

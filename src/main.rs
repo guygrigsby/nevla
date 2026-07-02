@@ -72,7 +72,7 @@ fn new_project(name: &str) -> ExitCode {
             root.join("mongoose.toml"),
             format!(
                 "[project]\nname = {name:?}\npython = {:?}\n",
-                mongoose::project::DEFAULT_PYTHON
+                mongoose::bridge::embedded_python()
             ),
         )?;
         std::fs::write(

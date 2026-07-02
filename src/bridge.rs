@@ -80,6 +80,18 @@ pub fn py_none() -> PyHandle {
     Python::attach(|py| PyHandle::new(py.None()))
 }
 
+/// "major.minor" of the linked CPython, readable before initialization.
+pub fn embedded_python() -> String {
+    let raw = unsafe { std::ffi::CStr::from_ptr(pyo3::ffi::Py_GetVersion()) };
+    let s = raw.to_string_lossy();
+    let ver = s.split_whitespace().next().unwrap_or("");
+    let mut it = ver.split('.');
+    match (it.next(), it.next()) {
+        (Some(maj), Some(min)) => format!("{maj}.{min}"),
+        _ => ver.to_string(),
+    }
+}
+
 pub fn import(name: &str) -> Result<PyHandle, ErrVal> {
     init(None);
     Python::attach(|py| match py.import(name) {
@@ -274,4 +286,15 @@ pub fn is_stdlib(name: &str) -> bool {
 
 pub fn is_none(h: &PyHandle) -> bool {
     Python::attach(|py| h.0.bind(py).is_none())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn embedded_python_is_major_minor() {
+        let v = super::embedded_python();
+        let parts: Vec<&str> = v.split('.').collect();
+        assert_eq!(parts.len(), 2, "{v}");
+        assert!(parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())), "{v}");
+    }
 }

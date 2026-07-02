@@ -358,8 +358,8 @@ be broken with an option, list, or map along the way:
 
 ```
 struct Node {
-    val: int
-    next: Node?      // ok; `next: Node` would be a compile error
+    val int
+    next Node?      // ok; `next Node` would be a compile error
 }
 ```
 
@@ -474,7 +474,7 @@ A complete program must declare `fn main` with an entry-point signature
 FunctionDecl = "fn" identifier Parameters [ Result ] Block .
 Parameters   = "(" [ ParameterList [ "," ] ] ")" .
 ParameterList = Parameter { "," Parameter } .
-Parameter    = identifier [ ":" Type ] .
+Parameter    = identifier [ Type ] .
 Result       = Type | "(" [ TypeList [ "," ] ] ")" .
 ```
 
@@ -489,7 +489,7 @@ with no results returns implicitly at the end of its body, and `return` with
 no values is permitted inside it.
 
 ```
-fn fetch(url: str) (str, error?) {
+fn fetch(url str) (str, error?) {
     return "", none
 }
 ```
@@ -499,17 +499,17 @@ fn fetch(url: str) (str, error?) {
 ```
 StructDecl = "struct" identifier "{" { newline } [ FieldDeclList ] "}" .
 FieldDeclList = FieldDecl { ( "," | newline ) { newline } FieldDecl } [ "," | newline ] { newline } .
-FieldDecl  = identifier ":" Type .
+FieldDecl  = identifier Type .
 ```
 
 Fields are separated by commas or line breaks; both of these are valid:
 
 ```
-struct User { name: str, age: int }
+struct User { name str, age int }
 
 struct User {
-    name: str
-    age: int
+    name str
+    age int
 }
 ```
 
@@ -603,7 +603,7 @@ a location of known list type. A bare `[]` with no such context is a
 compile-time error ("cannot infer element type of []").
 
 ```
-fn total(xs: list[int]) int { return len(xs) }
+fn total(xs list[int]) int { return len(xs) }
 
 print(total([]))     // ok: parameter supplies list[int]
 // xs := []          // compile error
@@ -679,7 +679,7 @@ Result typing:
 nums := [1, 2, 3, 4]
 big := nums.map(fn(x) { x * 2 }).filter(fn(x) { x > 2 }).sum()   // 18
 
-f := fn(x: int) int { return x * 2 }
+f := fn(x int) int { return x * 2 }
 ```
 
 Function literals capture by value: at the moment the literal is evaluated,
@@ -1275,7 +1275,7 @@ exceptions and no user-visible panic. Fallible functions return their error
 in a trailing `error?` result:
 
 ```
-fn fetch(url: str) (str, error?) { ... }
+fn fetch(url str) (str, error?) { ... }
 fn cleanup() (error?) { ... }
 ```
 
@@ -1318,7 +1318,7 @@ the error in its final slot with all other slots zero-filled. `error.wrap`
 adds context while preserving the cause chain:
 
 ```
-fn parse_age(s: str) (int, error?) {
+fn parse_age(s str) (int, error?) {
     n, err := int(s)
     if err != none {
         return 0, error.wrap(err, "bad age")
@@ -1349,7 +1349,7 @@ b := a
 b[0] = 99
 print(a[0])   // 1
 
-fn mutate(xs: list[int]) { xs[0] = 42 }
+fn mutate(xs list[int]) { xs[0] = 42 }
 mutate(a)
 print(a[0])   // 1
 ```
@@ -1586,28 +1586,28 @@ String methods (receiver `str`):
 
 | Method | Signature | Behavior |
 |--------|-----------|----------|
-| `split` | `(sep: str) list[str]` | split on separator |
+| `split` | `(sep str) list[str]` | split on separator |
 | `trim` | `() str` | strip leading and trailing white space |
 | `upper` | `() str` | uppercase |
 | `lower` | `() str` | lowercase |
-| `contains` | `(sub: str) bool` | substring test |
-| `starts_with` | `(prefix: str) bool` | prefix test |
-| `ends_with` | `(suffix: str) bool` | suffix test |
-| `replace` | `(from: str, to: str) str` | replace all occurrences |
+| `contains` | `(sub str) bool` | substring test |
+| `starts_with` | `(prefix str) bool` | prefix test |
+| `ends_with` | `(suffix str) bool` | suffix test |
+| `replace` | `(from str, to str) str` | replace all occurrences |
 
 List methods (receiver `list[T]`):
 
 | Method | Signature | Behavior |
 |--------|-----------|----------|
-| `map` | `(f: fn(T) U) list[U]` | apply `f` to each element |
-| `filter` | `(f: fn(T) bool) list[T]` | keep elements where `f` is true |
-| `each` | `(f: fn(T))` | call `f` on each element; no result |
+| `map` | `(f fn(T) U) list[U]` | apply `f` to each element |
+| `filter` | `(f fn(T) bool) list[T]` | keep elements where `f` is true |
+| `each` | `(f fn(T))` | call `f` on each element; no result |
 | `sum` | `() T` | `T` must be `int` or `float`; sum of elements. Summing an empty `list[int]` yields 0; the result of summing an empty `list[float]` is unspecified in v1 (the reference implementation yields a value that faults on later float use) |
 | `sorted` | `() list[T]` | `T` must be `int`, `float`, or `str`; ascending copy |
-| `sorted_by` | `(before: fn(T, T) bool) list[T]` | sorted copy per comparator; stable |
-| `append` | `(v: T) list[T]` | copy with `v` appended |
-| `contains` | `(v: T) bool` | structural membership (section 11.2) |
-| `join` | `(sep: str) str` | `T` must be `str`; concatenation with separator |
+| `sorted_by` | `(before fn(T, T) bool) list[T]` | sorted copy per comparator; stable |
+| `append` | `(v T) list[T]` | copy with `v` appended |
+| `contains` | `(v T) bool` | structural membership (section 11.2) |
+| `join` | `(sep str) str` | `T` must be `str`; concatenation with separator |
 
 Map methods (receiver `map[K, V]`):
 
@@ -1615,8 +1615,8 @@ Map methods (receiver `map[K, V]`):
 |--------|-----------|----------|
 | `keys` | `() list[K]` | keys in insertion order |
 | `values` | `() list[V]` | values in insertion order |
-| `has` | `(k: K) bool` | key presence |
-| `delete` | `(k: K) map[K, V]` | copy without `k`; remaining order preserved |
+| `has` | `(k K) bool` | key presence |
+| `delete` | `(k K) map[K, V]` | copy without `k`; remaining order preserved |
 
 ## 15. Standard library
 
@@ -1635,8 +1635,8 @@ part of the core language. `import "error"` remains legal and adds nothing.
 
 | Function | Signature | Behavior |
 |----------|-----------|----------|
-| `error.new` | `(msg: str) error` | new error with the message; empty `pytype`, `traceback`, no cause |
-| `error.wrap` | `(cause: error, msg: str) error` | new error with the message and the given cause |
+| `error.new` | `(msg str) error` | new error with the message; empty `pytype`, `traceback`, no cause |
+| `error.wrap` | `(cause error, msg str) error` | new error with the message and the given cause |
 
 Error fields are specified in section 5.7.
 
@@ -1659,13 +1659,13 @@ Paths are `str`. Contents are UTF-8 `str`; there is no bytes type in v1.
 
 | Function | Signature | Behavior |
 |----------|-----------|----------|
-| `file.read` | `(path: str) (str, error?)` | whole-file read; zero slot is `""` on error |
-| `file.write` | `(path: str, s: str) error?` | create or truncate, then write |
-| `file.append` | `(path: str, s: str) error?` | create if missing, append |
-| `file.exists` | `(path: str) bool` | existence test; never errors |
-| `file.list` | `(dir: str) (list[str], error?)` | entry names, sorted lexicographically |
-| `file.remove` | `(path: str) error?` | remove a file or an empty directory |
-| `file.mkdir` | `(path: str) error?` | create the directory and any missing parents |
+| `file.read` | `(path str) (str, error?)` | whole-file read; zero slot is `""` on error |
+| `file.write` | `(path str, s str) error?` | create or truncate, then write |
+| `file.append` | `(path str, s str) error?` | create if missing, append |
+| `file.exists` | `(path str) bool` | existence test; never errors |
+| `file.list` | `(dir str) (list[str], error?)` | entry names, sorted lexicographically |
+| `file.remove` | `(path str) error?` | remove a file or an empty directory |
+| `file.mkdir` | `(path str) error?` | create the directory and any missing parents |
 
 ### 15.4 ctx
 
@@ -1677,8 +1677,8 @@ constructed with a struct literal (section 7.2.3).
 | Function | Signature | Behavior |
 |----------|-----------|----------|
 | `ctx.background` | `() Ctx` | never done |
-| `ctx.timeout` | `(parent: Ctx, secs: float) Ctx` | deadline `secs` from now, clamped so a child deadline never exceeds its parent's |
-| `ctx.interrupt` | `(parent: Ctx) Ctx` | additionally becomes done when the process receives SIGINT |
+| `ctx.timeout` | `(parent Ctx, secs float) Ctx` | deadline `secs` from now, clamped so a child deadline never exceeds its parent's |
+| `ctx.interrupt` | `(parent Ctx) Ctx` | additionally becomes done when the process receives SIGINT |
 
 Methods on `Ctx`:
 
@@ -1692,15 +1692,15 @@ Methods on `Ctx`:
 Importing `"http"` also declares two struct types:
 
 ```
-struct Request  { method: str, url: str, body: str, headers: map[str, str] }
-struct Response { status: int, body: str, headers: map[str, str] }
+struct Request  { method str, url str, body str, headers map[str, str] }
+struct Response { status int, body str, headers map[str, str] }
 ```
 
 | Function | Signature |
 |----------|-----------|
-| `http.get` | `(c: Ctx, url: str) (Response, error?)` |
-| `http.post` | `(c: Ctx, url: str, body: str) (Response, error?)` |
-| `http.request` | `(c: Ctx, req: Request) (Response, error?)` |
+| `http.get` | `(c Ctx, url str) (Response, error?)` |
+| `http.post` | `(c Ctx, url str, body str) (Response, error?)` |
+| `http.request` | `(c Ctx, req Request) (Response, error?)` |
 
 Behavior:
 
@@ -1729,8 +1729,8 @@ equal to the file's stem (the file name without `.mg`):
 
 ```
 // util.mg
-struct Pair { a: int, b: int }
-fn double(x: int) int { return x * 2 }
+struct Pair { a int, b int }
+fn double(x int) int { return x * 2 }
 
 // main.mg
 import "util.mg"
@@ -1823,6 +1823,11 @@ case-insensitively with `-` and `_` interchangeable, mirroring PyPI name
 normalization (`sentence-transformers` satisfies
 `import py "sentence_transformers"`). An undeclared import is a compile-time
 error directing the user to `mongoose py add`.
+
+The manifest's `python` pin must match the interpreter embedded in the
+running mongoose (major.minor); a mismatch is a compile-time error naming
+both versions. When the pin is omitted it defaults to the embedded version.
+`mongoose new` scaffolds with the embedded version.
 
 Outside a project there is no manifest to check; py imports resolve at
 program start against the embedded interpreter, and a missing module is a

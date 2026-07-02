@@ -115,6 +115,13 @@ fn compile_and(path: &Path, run: bool) -> RunResult {
                 Ok(p) => p,
                 Err(e) => return compile_err(e),
             };
+            let embedded = bridge::embedded_python();
+            if proj.python != embedded {
+                return compile_err(format!(
+                    "project pins python {} but this mongoose embeds {embedded}; set python = {embedded:?} in mongoose.toml and rerun mongoose py add",
+                    proj.python
+                ));
+            }
             let provision =
                 run && (!proj.py_deps.is_empty() || root.join("mongoose.lock").exists());
             if provision {

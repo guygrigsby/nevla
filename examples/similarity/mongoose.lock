@@ -105,7 +105,6 @@ typer==0.25.1
     #   transformers
 typing-extensions==4.15.0
     # via
-    #   anyio
     #   huggingface-hub
     #   sentence-transformers
     #   torch
