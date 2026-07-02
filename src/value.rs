@@ -20,6 +20,9 @@ pub enum Value {
     Err(ErrVal),
     Fn(FnRef),
     Module(String),
+    /// Opaque context: deadline plus interrupt flag. Shared by reference,
+    /// like py values; it is a handle, not data.
+    Ctx(std::sync::Arc<crate::stdlib::ctx::CtxInner>),
     Tuple(Vec<Value>),
     Unit,
 }

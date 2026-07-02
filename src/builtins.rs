@@ -86,6 +86,7 @@ impl Interp<'_> {
     ) -> Result<Value, Fault> {
         match recv {
             Value::Module(m) => self.module_call(&m, name, args),
+            Value::Ctx(c) => crate::stdlib::ctx::method(self, &c, name),
             Value::List(items) => self.list_method(items, name, args),
             Value::Str(s) => self.str_method(&s, name, args),
             Value::Map(m) => {
@@ -374,6 +375,7 @@ pub fn render(v: &Value) -> String {
         Value::Err(e) => format!("error({})", e.msg),
         Value::Fn(_) => "fn".into(),
         Value::Module(m) => format!("module {m}"),
+        Value::Ctx(_) => "ctx".into(),
         Value::Tuple(items) => items.iter().map(render).collect::<Vec<_>>().join(", "),
         Value::Unit => "()".into(),
     }
