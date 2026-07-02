@@ -25,14 +25,22 @@ fn new_then_run() {
         .current_dir(&d)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(d.join("hello/mongoose.toml").exists());
     let out = Command::new(bin())
         .args(["run", "src/main.mg"])
         .current_dir(d.join("hello"))
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, mongoose\n");
 }
 
@@ -40,15 +48,27 @@ fn new_then_run() {
 fn check_reports_and_fails() {
     let d = tempdir("check");
     let bad = d.join("bad.mg");
-    std::fs::write(&bad, "fn main() {\n    if 1 {\n        print(\"x\")\n    }\n}\n").unwrap();
-    let out = Command::new(bin()).args(["check"]).arg(&bad).output().unwrap();
+    std::fs::write(
+        &bad,
+        "fn main() {\n    if 1 {\n        print(\"x\")\n    }\n}\n",
+    )
+    .unwrap();
+    let out = Command::new(bin())
+        .args(["check"])
+        .arg(&bad)
+        .output()
+        .unwrap();
     assert!(!out.status.success());
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("condition must be bool"), "{err}");
     // check never runs the program
     let ok = d.join("ok.mg");
     std::fs::write(&ok, "fn main() {\n    print(\"ran\")\n}\n").unwrap();
-    let out = Command::new(bin()).args(["check"]).arg(&ok).output().unwrap();
+    let out = Command::new(bin())
+        .args(["check"])
+        .arg(&ok)
+        .output()
+        .unwrap();
     assert!(out.status.success());
     assert_eq!(String::from_utf8_lossy(&out.stdout), "");
 }
@@ -61,14 +81,22 @@ fn bare_run_resolves_project_main() {
         .current_dir(&d)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     // from the project root
     let out = Command::new(bin())
         .args(["run"])
         .current_dir(d.join("hello"))
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, mongoose\n");
     // and from a subdirectory, walking up to mongoose.toml
     let out = Command::new(bin())
@@ -76,7 +104,11 @@ fn bare_run_resolves_project_main() {
         .current_dir(d.join("hello/src"))
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, mongoose\n");
     // bare check works the same way and runs nothing
     let out = Command::new(bin())
@@ -84,7 +116,11 @@ fn bare_run_resolves_project_main() {
         .current_dir(d.join("hello"))
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "");
 }
 
@@ -92,10 +128,20 @@ fn bare_run_resolves_project_main() {
 fn bare_run_outside_project_errors() {
     let d = tempdir("bare-none");
     for cmd in ["run", "check"] {
-        let out = Command::new(bin()).args([cmd]).current_dir(&d).output().unwrap();
-        assert!(!out.status.success(), "bare {cmd} should fail outside a project");
+        let out = Command::new(bin())
+            .args([cmd])
+            .current_dir(&d)
+            .output()
+            .unwrap();
+        assert!(
+            !out.status.success(),
+            "bare {cmd} should fail outside a project"
+        );
         let err = String::from_utf8_lossy(&out.stderr);
-        assert!(err.contains("no file given and no mongoose project found"), "{cmd}: {err}");
+        assert!(
+            err.contains("no file given and no mongoose project found"),
+            "{cmd}: {err}"
+        );
     }
 }
 
@@ -105,7 +151,11 @@ fn mg_runs_file() {
     let f = d.join("hi.mg");
     std::fs::write(&f, "fn main() {\n    print(\"hi from mg\")\n}\n").unwrap();
     let out = Command::new(mg()).arg(&f).output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "hi from mg\n");
 }
 
@@ -117,7 +167,12 @@ fn mg_bare_is_repl() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
-    child.stdin.as_mut().unwrap().write_all(b"1 + 2\nx := 40\nx + 2\n").unwrap();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"1 + 2\nx := 40\nx + 2\n")
+        .unwrap();
     let out = child.wait_with_output().unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("3\n"), "{stdout}");
@@ -131,12 +186,19 @@ fn mg_shebang_script_executes_directly() {
     let script = d.join("greet");
     std::fs::write(
         &script,
-        format!("#!{}\nfn main() {{\n    print(\"hi from script\")\n}}\n", mg()),
+        format!(
+            "#!{}\nfn main() {{\n    print(\"hi from script\")\n}}\n",
+            mg()
+        ),
     )
     .unwrap();
     std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
     let out = Command::new(&script).output().unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "hi from script\n");
 }
 

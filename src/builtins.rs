@@ -45,7 +45,13 @@ impl Interp<'_> {
     pub(crate) fn convert(&mut self, target: &TypeExpr, v: Value) -> Result<Value, Fault> {
         let ok = |v| Ok(Value::Tuple(vec![v, Value::NoneV]));
         let fail = |this: &Self, t: &TypeExpr, msg: String| {
-            Ok(Value::Tuple(vec![this.zero(t), Value::Err(ErrVal { msg, ..Default::default() })]))
+            Ok(Value::Tuple(vec![
+                this.zero(t),
+                Value::Err(ErrVal {
+                    msg,
+                    ..Default::default()
+                }),
+            ]))
         };
         let name = match target {
             TypeExpr::Named(n) => n.as_str(),
@@ -89,7 +95,11 @@ impl Interp<'_> {
             ("str", v) => ok(Value::Str(render(&v))),
             ("list", Value::List(items)) => ok(Value::List(items)),
             // py conversions land with the bridge
-            (t, v) => fail(self, target, format!("cannot convert {} to {t}", render(&v))),
+            (t, v) => fail(
+                self,
+                target,
+                format!("cannot convert {} to {t}", render(&v)),
+            ),
         }
     }
 
@@ -107,9 +117,7 @@ impl Interp<'_> {
             Value::Map(m) => {
                 let arg = args.pop();
                 match (name, arg) {
-                    ("keys", None) => {
-                        Ok(Value::List(m.keys().map(|k| k.to_value()).collect()))
-                    }
+                    ("keys", None) => Ok(Value::List(m.keys().map(|k| k.to_value()).collect())),
                     ("values", None) => Ok(Value::List(m.values().cloned().collect())),
                     ("has", Some(k)) => match crate::value::MapKey::from_value(&k) {
                         Some(key) => Ok(Value::Bool(m.contains_key(&key))),
@@ -138,7 +146,9 @@ impl Interp<'_> {
     ) -> Result<Value, Fault> {
         match name {
             "map" => {
-                let f = args.pop().ok_or_else(|| self.fault("map needs a function"))?;
+                let f = args
+                    .pop()
+                    .ok_or_else(|| self.fault("map needs a function"))?;
                 let mut out = vec![];
                 for it in items {
                     out.push(self.call_value(&f, vec![it])?);
@@ -146,7 +156,9 @@ impl Interp<'_> {
                 Ok(Value::List(out))
             }
             "filter" => {
-                let f = args.pop().ok_or_else(|| self.fault("filter needs a function"))?;
+                let f = args
+                    .pop()
+                    .ok_or_else(|| self.fault("filter needs a function"))?;
                 let mut out = vec![];
                 for it in items {
                     if matches!(self.call_value(&f, vec![it.clone()])?, Value::Bool(true)) {
@@ -156,7 +168,9 @@ impl Interp<'_> {
                 Ok(Value::List(out))
             }
             "each" => {
-                let f = args.pop().ok_or_else(|| self.fault("each needs a function"))?;
+                let f = args
+                    .pop()
+                    .ok_or_else(|| self.fault("each needs a function"))?;
                 for it in items {
                     self.call_value(&f, vec![it])?;
                 }
@@ -176,7 +190,11 @@ impl Interp<'_> {
                         _ => return Err(self.fault("sum needs numbers")),
                     }
                 }
-                Ok(if is_float { Value::Float(floats) } else { Value::Int(ints) })
+                Ok(if is_float {
+                    Value::Float(floats)
+                } else {
+                    Value::Int(ints)
+                })
             }
             "sorted" => {
                 let mut out = items;
@@ -201,15 +219,16 @@ impl Interp<'_> {
                 }
             }
             "sorted_by" => {
-                let f = args.pop().ok_or_else(|| self.fault("sorted_by needs a function"))?;
+                let f = args
+                    .pop()
+                    .ok_or_else(|| self.fault("sorted_by needs a function"))?;
                 // ponytail: insertion sort, O(n^2); a comparator-driven merge
                 // sort if big lists ever matter
                 let mut out: Vec<Value> = vec![];
                 for it in items {
                     let mut pos = out.len();
                     for (i, existing) in out.iter().enumerate() {
-                        let before = self
-                            .call_value(&f, vec![it.clone(), existing.clone()])?;
+                        let before = self.call_value(&f, vec![it.clone(), existing.clone()])?;
                         if matches!(before, Value::Bool(true)) {
                             pos = i;
                             break;
@@ -220,13 +239,17 @@ impl Interp<'_> {
                 Ok(Value::List(out))
             }
             "append" => {
-                let v = args.pop().ok_or_else(|| self.fault("append needs a value"))?;
+                let v = args
+                    .pop()
+                    .ok_or_else(|| self.fault("append needs a value"))?;
                 let mut out = items;
                 out.push(v);
                 Ok(Value::List(out))
             }
             "contains" => {
-                let v = args.pop().ok_or_else(|| self.fault("contains needs a value"))?;
+                let v = args
+                    .pop()
+                    .ok_or_else(|| self.fault("contains needs a value"))?;
                 Ok(Value::Bool(items.iter().any(|it| it.eq_value(&v))))
             }
             "join" => {
@@ -259,7 +282,9 @@ impl Interp<'_> {
             "lower" => Ok(Value::Str(s.to_lowercase())),
             "split" => {
                 let sep = one_str(self, &mut args)?;
-                Ok(Value::List(s.split(&sep).map(|p| Value::Str(p.to_string())).collect()))
+                Ok(Value::List(
+                    s.split(&sep).map(|p| Value::Str(p.to_string())).collect(),
+                ))
             }
             "contains" => {
                 let needle = one_str(self, &mut args)?;

@@ -40,7 +40,11 @@ fn golden() {
     let mut failures = vec![];
     let mut ran = 0;
     for mg in &cases {
-        let rel = mg.strip_prefix(&root).unwrap().to_string_lossy().to_string();
+        let rel = mg
+            .strip_prefix(&root)
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
         if skip.contains(&rel) {
             continue;
         }

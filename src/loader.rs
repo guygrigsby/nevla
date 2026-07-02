@@ -20,7 +20,11 @@ pub fn load(path: &Path) -> Result<Program, Diag> {
 }
 
 fn errd(msg: String) -> Diag {
-    Diag { msg, line: 1, col: 1 }
+    Diag {
+        msg,
+        line: 1,
+        col: 1,
+    }
 }
 
 fn load_file(
@@ -37,7 +41,12 @@ fn load_file(
         let names: Vec<String> = loading
             .iter()
             .chain([&canon])
-            .map(|p| p.file_name().unwrap_or_default().to_string_lossy().to_string())
+            .map(|p| {
+                p.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            })
             .collect();
         return Err(errd(format!("import cycle: {}", names.join(" -> "))));
     }
@@ -51,7 +60,10 @@ fn load_file(
     loading.push(canon.clone());
     let dir = canon.parent().map(Path::to_path_buf).unwrap_or_default();
     for d in &prog.decls {
-        if let Decl::Import { path: p, py: false, .. } = d {
+        if let Decl::Import {
+            path: p, py: false, ..
+        } = d
+        {
             if p.ends_with(".mg") {
                 load_file(&dir.join(p), false, loading, loaded, merged)?;
             }
@@ -69,7 +81,10 @@ fn load_file(
     }
     // rewrite file imports to plain namespace markers understood downstream
     for d in &mut prog.decls {
-        if let Decl::Import { path: p, py: false, .. } = d {
+        if let Decl::Import {
+            path: p, py: false, ..
+        } = d
+        {
             if p.ends_with(".mg") {
                 *p = Path::new(&p.clone())
                     .file_stem()
@@ -97,12 +112,17 @@ fn rename_module(prog: &mut Program, stem: &str) {
             Decl::Import { .. } => {}
         }
     }
-    let mut r = Renamer { decls, prefix: stem.to_string(), locals: vec![] };
+    let mut r = Renamer {
+        decls,
+        prefix: stem.to_string(),
+        locals: vec![],
+    };
     for d in &mut prog.decls {
         match d {
             Decl::Fn(f) => {
                 f.name = r.mangled(&f.name);
-                r.locals.push(f.params.iter().map(|p| p.name.clone()).collect());
+                r.locals
+                    .push(f.params.iter().map(|p| p.name.clone()).collect());
                 for p in &mut f.params {
                     if let Some(t) = &mut p.ty {
                         r.ty(t);
@@ -192,7 +212,12 @@ impl Renamer {
                     self.expr(e);
                 }
             }
-            StmtKind::If { cond, then, elifs, els } => {
+            StmtKind::If {
+                cond,
+                then,
+                elifs,
+                els,
+            } => {
                 self.expr(cond);
                 self.block(then);
                 for (c, b) in elifs {
@@ -275,7 +300,8 @@ impl Renamer {
                 self.expr(hi);
             }
             ExprKind::Lambda { params, ret, body } => {
-                self.locals.push(params.iter().map(|p| p.name.clone()).collect());
+                self.locals
+                    .push(params.iter().map(|p| p.name.clone()).collect());
                 for p in params.iter_mut() {
                     if let Some(t) = &mut p.ty {
                         self.ty(t);

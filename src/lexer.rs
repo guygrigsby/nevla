@@ -21,7 +21,12 @@ impl<'a> Lexer<'a> {
         } else {
             src
         };
-        Lexer { chars: src.chars().peekable(), line: 1, col: 1, out: vec![] }
+        Lexer {
+            chars: src.chars().peekable(),
+            line: 1,
+            col: 1,
+            out: vec![],
+        }
     }
 
     fn bump(&mut self) -> Option<char> {
@@ -36,11 +41,19 @@ impl<'a> Lexer<'a> {
     }
 
     fn push(&mut self, tok: Token, line: u32, col: u32) {
-        self.out.push(Spanned { node: tok, line, col });
+        self.out.push(Spanned {
+            node: tok,
+            line,
+            col,
+        });
     }
 
     fn err(&self, msg: &str, line: u32, col: u32) -> Diag {
-        Diag { msg: msg.into(), line, col }
+        Diag {
+            msg: msg.into(),
+            line,
+            col,
+        }
     }
 
     fn run(mut self) -> Result<Vec<Spanned<Token>>, Diag> {
@@ -52,7 +65,10 @@ impl<'a> Lexer<'a> {
                 }
                 '\n' => {
                     self.bump();
-                    if !matches!(self.out.last().map(|s| &s.node), None | Some(Token::Newline)) {
+                    if !matches!(
+                        self.out.last().map(|s| &s.node),
+                        None | Some(Token::Newline)
+                    ) {
                         self.push(Token::Newline, line, col);
                     }
                 }
@@ -123,7 +139,9 @@ impl<'a> Lexer<'a> {
                         let v = n.parse().map_err(|_| self.err("bad float", line, col))?;
                         self.push(Token::Float(v), line, col);
                     } else {
-                        let v = n.parse().map_err(|_| self.err("int too large", line, col))?;
+                        let v = n
+                            .parse()
+                            .map_err(|_| self.err("int too large", line, col))?;
                         self.push(Token::Int(v), line, col);
                     }
                 }
@@ -203,7 +221,11 @@ impl<'a> Lexer<'a> {
                             }
                         }
                         other => {
-                            return Err(self.err(&format!("unexpected character {other:?}"), line, col))
+                            return Err(self.err(
+                                &format!("unexpected character {other:?}"),
+                                line,
+                                col,
+                            ))
                         }
                     };
                     self.push(tok, line, col);
@@ -256,7 +278,10 @@ mod tests {
 
     #[test]
     fn string_escapes() {
-        assert_eq!(toks(r#""a\nb\t\"q\"\\""#), vec![Str("a\nb\t\"q\"\\".into())]);
+        assert_eq!(
+            toks(r#""a\nb\t\"q\"\\""#),
+            vec![Str("a\nb\t\"q\"\\".into())]
+        );
     }
 
     #[test]
@@ -270,10 +295,7 @@ mod tests {
     fn numbers() {
         assert_eq!(toks("1 2.5 3.0"), vec![Int(1), Float(2.5), Float(3.0)]);
         // dot not followed by digit stays a method call, not a float
-        assert_eq!(
-            toks("1.abs"),
-            vec![Int(1), Dot, Ident("abs".into())]
-        );
+        assert_eq!(toks("1.abs"), vec![Int(1), Dot, Ident("abs".into())]);
     }
 
     #[test]

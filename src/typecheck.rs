@@ -85,9 +85,10 @@ fn std_member(module: &str, name: &str) -> Option<Member> {
         ("ctx", "interrupt") => Member::Fn(vec![ctx()], vec![ctx()]),
         ("http", "get") => Member::Fn(vec![ctx(), Str], vec![resp(), err_opt()]),
         ("http", "post") => Member::Fn(vec![ctx(), Str, Str], vec![resp(), err_opt()]),
-        ("http", "request") => {
-            Member::Fn(vec![ctx(), Struct("Request".into())], vec![resp(), err_opt()])
-        }
+        ("http", "request") => Member::Fn(
+            vec![ctx(), Struct("Request".into())],
+            vec![resp(), err_opt()],
+        ),
         _ => return None,
     };
     Some(m)
@@ -95,18 +96,29 @@ fn std_member(module: &str, name: &str) -> Option<Member> {
 
 impl Checker {
     fn diag(&mut self, line: u32, col: u32, msg: impl Into<String>) {
-        self.diags.push(Diag { msg: msg.into(), line, col });
+        self.diags.push(Diag {
+            msg: msg.into(),
+            line,
+            col,
+        });
     }
 
     // ---------- collection pass ----------
 
     fn collect(&mut self, prog: &Program) {
         for d in &prog.decls {
-            if let Decl::Import { path, py, line: _, col: _ } = d {
+            if let Decl::Import {
+                path,
+                py,
+                line: _,
+                col: _,
+            } = d
+            {
                 if *py {
                     self.imports.insert(path.clone(), ImportKind::Py);
                 } else if STD_MODULES.contains(&path.as_str()) {
-                    self.imports.insert(path.clone(), ImportKind::Std(path.clone()));
+                    self.imports
+                        .insert(path.clone(), ImportKind::Std(path.clone()));
                     if path == "http" {
                         self.structs.insert(
                             "Request".into(),
@@ -140,7 +152,10 @@ impl Checker {
             }
         }
         for d in &prog.decls {
-            if let Decl::Struct { name, line, col, .. } = d {
+            if let Decl::Struct {
+                name, line, col, ..
+            } = d
+            {
                 if self.structs.contains_key(name) {
                     self.diag(*line, *col, format!("duplicate struct: {name}"));
                     continue;
@@ -149,7 +164,13 @@ impl Checker {
             }
         }
         for d in &prog.decls {
-            if let Decl::Struct { name, fields, line, col } = d {
+            if let Decl::Struct {
+                name,
+                fields,
+                line,
+                col,
+            } = d
+            {
                 let fs: Vec<(String, Type)> = fields
                     .iter()
                     .map(|(f, t)| (f.clone(), self.resolve(t, *line, *col)))
@@ -160,15 +181,21 @@ impl Checker {
         // a by-value field cycle can never be constructed; an option, list,
         // or map along the way breaks the cycle
         for d in &prog.decls {
-            if let Decl::Struct { name, line, col, .. } = d {
-                let cycle = self.structs.get(name).into_iter().flatten().find_map(|(f, t)| {
-                    match t {
-                        Type::Struct(s) if s == name || self.reaches_by_value(s, name) => {
-                            Some((f.clone(), s.clone()))
-                        }
-                        _ => None,
-                    }
-                });
+            if let Decl::Struct {
+                name, line, col, ..
+            } = d
+            {
+                let cycle =
+                    self.structs
+                        .get(name)
+                        .into_iter()
+                        .flatten()
+                        .find_map(|(f, t)| match t {
+                            Type::Struct(s) if s == name || self.reaches_by_value(s, name) => {
+                                Some((f.clone(), s.clone()))
+                            }
+                            _ => None,
+                        });
                 if let Some((field, fty)) = cycle {
                     self.diag(
                         *line,
@@ -190,7 +217,11 @@ impl Checker {
                         }
                     }
                 }
-                let rets = f.ret.iter().map(|t| self.resolve(t, f.line, f.col)).collect();
+                let rets = f
+                    .ret
+                    .iter()
+                    .map(|t| self.resolve(t, f.line, f.col))
+                    .collect();
                 if self.fns.insert(f.name.clone(), (params, rets)).is_some() {
                     self.diag(f.line, f.col, format!("duplicate function: {}", f.name));
                 }
@@ -199,7 +230,13 @@ impl Checker {
         // second import pass: a path that isn't stdlib or py is a file import
         // if the merged program has symbols under its namespace
         for d in &prog.decls {
-            if let Decl::Import { path, py: false, line, col } = d {
+            if let Decl::Import {
+                path,
+                py: false,
+                line,
+                col,
+            } = d
+            {
                 if STD_MODULES.contains(&path.as_str()) {
                     continue;
                 }
@@ -207,7 +244,8 @@ impl Checker {
                 let has_symbols = self.fns.keys().any(|k| k.starts_with(&prefix))
                     || self.structs.keys().any(|k| k.starts_with(&prefix));
                 if has_symbols {
-                    self.imports.insert(path.clone(), ImportKind::File(path.clone()));
+                    self.imports
+                        .insert(path.clone(), ImportKind::File(path.clone()));
                 } else {
                     self.diag(*line, *col, format!("unknown module: {path}"));
                 }
@@ -258,7 +296,11 @@ impl Checker {
             TypeExpr::Map(k, v) => {
                 let kt = self.resolve(k, line, col);
                 if !matches!(kt, Type::Int | Type::Str | Type::Bool | Type::Unknown) {
-                    self.diag(line, col, format!("map key type must be int, str, or bool, got {kt}"));
+                    self.diag(
+                        line,
+                        col,
+                        format!("map key type must be int, str, or bool, got {kt}"),
+                    );
                 }
                 Type::Map(Box::new(kt), Box::new(self.resolve(v, line, col)))
             }
@@ -308,11 +350,19 @@ impl Checker {
         if self.scopes.last().unwrap().vars.contains_key(name) {
             self.diag(line, col, format!("already declared: {name}"));
         }
-        self.scopes.last_mut().unwrap().vars.insert(name.to_string(), ty);
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .vars
+            .insert(name.to_string(), ty);
     }
 
     fn refine(&mut self, name: &str, ty: Type) {
-        self.scopes.last_mut().unwrap().refits.insert(name.to_string(), ty);
+        self.scopes
+            .last_mut()
+            .unwrap()
+            .refits
+            .insert(name.to_string(), ty);
     }
 
     /// Drops every refinement of `name`, in all scopes. Assignments can
@@ -332,7 +382,11 @@ impl Checker {
             Some((params, rets)) => {
                 let ok = params.is_empty() && (rets.is_empty() || rets == &[err_opt()]);
                 if !ok {
-                    self.diag(1, 1, "fn main takes no parameters and returns nothing or (error?)");
+                    self.diag(
+                        1,
+                        1,
+                        "fn main takes no parameters and returns nothing or (error?)",
+                    );
                 }
             }
         }
@@ -344,10 +398,17 @@ impl Checker {
     }
 
     fn check_fn(&mut self, f: &FnDecl) {
-        self.current_ret = self.fns.get(&f.name).map(|(_, r)| r.clone()).unwrap_or_default();
+        self.current_ret = self
+            .fns
+            .get(&f.name)
+            .map(|(_, r)| r.clone())
+            .unwrap_or_default();
         self.push_scope();
-        let param_tys: Vec<Type> =
-            self.fns.get(&f.name).map(|(p, _)| p.clone()).unwrap_or_default();
+        let param_tys: Vec<Type> = self
+            .fns
+            .get(&f.name)
+            .map(|(p, _)| p.clone())
+            .unwrap_or_default();
         for (p, t) in f.params.iter().zip(param_tys) {
             self.declare(&p.name, t, f.line, f.col);
         }
@@ -490,7 +551,12 @@ impl Checker {
                 }
                 true
             }
-            StmtKind::If { cond, then, elifs, els } => {
+            StmtKind::If {
+                cond,
+                then,
+                elifs,
+                els,
+            } => {
                 self.check_cond(cond);
                 // then-branch with positive narrowing
                 self.push_scope();
@@ -621,7 +687,11 @@ impl Checker {
     fn check_cond(&mut self, cond: &Expr) {
         let t = self.expr_one(cond, Some(&Type::Bool));
         if !matches!(t, Type::Bool | Type::Unknown) {
-            self.diag(cond.line, cond.col, format!("condition must be bool, got {t}"));
+            self.diag(
+                cond.line,
+                cond.col,
+                format!("condition must be bool, got {t}"),
+            );
         }
     }
 
@@ -858,10 +928,16 @@ impl Checker {
                     }
                 }
             }
-            K::Lambda { params, ret, body } => one(self.lambda(params, ret, body, expected, line, col)),
+            K::Lambda { params, ret, body } => {
+                one(self.lambda(params, ret, body, expected, line, col))
+            }
             K::Check(inner) => {
                 if self.current_ret.last() != Some(&err_opt()) {
-                    self.diag(line, col, "check requires enclosing function to return error?");
+                    self.diag(
+                        line,
+                        col,
+                        "check requires enclosing function to return error?",
+                    );
                 }
                 let ty = self.check_expr(inner, None);
                 let parts = match ty {
@@ -883,15 +959,15 @@ impl Checker {
             K::Conv { target, arg } => {
                 let t = self.resolve(target, line, col);
                 let at = self.expr_pyish(arg, None);
-                let ok = match (&t, &at) {
-                    (_, Type::Py) | (_, Type::Unknown) => true,
-                    (Type::Int, Type::Int | Type::Float | Type::Str) => true,
-                    (Type::Float, Type::Int | Type::Float | Type::Str) => true,
-                    (Type::Bool, Type::Str | Type::Bool) => true,
-                    (Type::Str, _) => true,
-                    (Type::List(_), Type::List(_)) => true,
-                    _ => false,
-                };
+                let ok = matches!(
+                    (&t, &at),
+                    (_, Type::Py)
+                        | (_, Type::Unknown)
+                        | (Type::Int | Type::Float, Type::Int | Type::Float | Type::Str)
+                        | (Type::Bool, Type::Str | Type::Bool)
+                        | (Type::Str, _)
+                        | (Type::List(_), Type::List(_))
+                );
                 if !ok {
                     self.diag(line, col, format!("cannot convert {at} to {t}"));
                 }
@@ -951,7 +1027,9 @@ impl Checker {
                 if !unknown {
                     let ok = matches!(
                         (&lt, &rt),
-                        (Type::Int, Type::Int) | (Type::Float, Type::Float) | (Type::Str, Type::Str)
+                        (Type::Int, Type::Int)
+                            | (Type::Float, Type::Float)
+                            | (Type::Str, Type::Str)
                     );
                     if !ok {
                         self.diag(line, col, format!("cannot compare {lt} and {rt}"));
@@ -968,10 +1046,8 @@ impl Checker {
                         self.diag(line, col, "none only compares to option types");
                     }
                 } else if !unknown {
-                    let comparable = matches!(
-                        &lt,
-                        Type::Int | Type::Float | Type::Str | Type::Bool
-                    ) && lt == rt;
+                    let comparable =
+                        matches!(&lt, Type::Int | Type::Float | Type::Str | Type::Bool) && lt == rt;
                     if !comparable {
                         self.diag(line, col, format!("cannot compare {lt} and {rt}"));
                     }
@@ -1016,7 +1092,11 @@ impl Checker {
                                 self.check_format(name, fmt, &arg_tys, line, col);
                             }
                         }
-                        return ExprTy::One(if name == "sprintf" { Type::Str } else { Type::Unit });
+                        return ExprTy::One(if name == "sprintf" {
+                            Type::Str
+                        } else {
+                            Type::Unit
+                        });
                     }
                     "len" => {
                         if args.len() != 1 {
@@ -1027,7 +1107,11 @@ impl Checker {
                                 t,
                                 Type::Str | Type::List(_) | Type::Map(..) | Type::Unknown
                             ) {
-                                self.diag(line, col, format!("len needs str, list, or map, got {t}"));
+                                self.diag(
+                                    line,
+                                    col,
+                                    format!("len needs str, list, or map, got {t}"),
+                                );
                             }
                         }
                         return ExprTy::One(Type::Int);
@@ -1134,7 +1218,11 @@ impl Checker {
 
     fn check_args(&mut self, params: &[Type], args: &[Expr], line: u32, col: u32) {
         if params.len() != args.len() {
-            self.diag(line, col, format!("expected {} arguments, got {}", params.len(), args.len()));
+            self.diag(
+                line,
+                col,
+                format!("expected {} arguments, got {}", params.len(), args.len()),
+            );
         }
         for (p, a) in params.iter().zip(args) {
             let t = self.expr_one(a, Some(p));
@@ -1195,7 +1283,11 @@ impl Checker {
                     }
                     let t0 = self.expr_one(&args[0], None);
                     if !matches!(t0, Type::Int | Type::Float | Type::Unknown) {
-                        self.diag(line, col, format!("math.{name} needs int or float, got {t0}"));
+                        self.diag(
+                            line,
+                            col,
+                            format!("math.{name} needs int or float, got {t0}"),
+                        );
                     }
                     for a in &args[1..] {
                         let t = self.expr_one(a, Some(&t0));
@@ -1238,7 +1330,11 @@ impl Checker {
                 self.container_method(&rt, name, args, line, col)
             }
             Type::Opt(_) => {
-                self.diag(line, col, format!("value might be none; check it before calling {name}"));
+                self.diag(
+                    line,
+                    col,
+                    format!("value might be none; check it before calling {name}"),
+                );
                 ExprTy::One(Type::Unknown)
             }
             Type::Unknown => ExprTy::One(Type::Unknown),
@@ -1298,14 +1394,22 @@ impl Checker {
             (List(elem), "sum") => {
                 self.check_args(&[], args, line, col);
                 if !matches!(**elem, Int | Float | Unknown) {
-                    self.diag(line, col, format!("sum needs list[int] or list[float], got {recv}"));
+                    self.diag(
+                        line,
+                        col,
+                        format!("sum needs list[int] or list[float], got {recv}"),
+                    );
                 }
                 one((**elem).clone())
             }
             (List(elem), "sorted") => {
                 self.check_args(&[], args, line, col);
                 if !matches!(**elem, Int | Float | Str | Unknown) {
-                    self.diag(line, col, format!("sorted needs comparable elements, got {recv}"));
+                    self.diag(
+                        line,
+                        col,
+                        format!("sorted needs comparable elements, got {recv}"),
+                    );
                 }
                 one(recv.clone())
             }
@@ -1378,9 +1482,11 @@ impl Checker {
             return Type::Py;
         }
         match &rt {
-            Type::Struct(s) => match self.structs.get(s).and_then(|fs| {
-                fs.iter().find(|(f, _)| f == name).map(|(_, t)| t.clone())
-            }) {
+            Type::Struct(s) => match self
+                .structs
+                .get(s)
+                .and_then(|fs| fs.iter().find(|(f, _)| f == name).map(|(_, t)| t.clone()))
+            {
                 Some(t) => t,
                 None => {
                     self.diag(line, col, format!("{s} has no field {name}"));
@@ -1427,7 +1533,11 @@ impl Checker {
                 }
             },
             Type::Opt(_) => {
-                self.diag(line, col, format!("value might be none; check it before using .{name}"));
+                self.diag(
+                    line,
+                    col,
+                    format!("value might be none; check it before using .{name}"),
+                );
                 Type::Unknown
             }
             Type::Unknown => Type::Unknown,
@@ -1458,15 +1568,20 @@ impl Checker {
                 None => match expected_fn.as_ref().and_then(|(a, _)| a.get(i)) {
                     Some(t) => t.clone(),
                     None => {
-                        self.diag(line, col, format!("lambda parameter {} needs a type here", p.name));
+                        self.diag(
+                            line,
+                            col,
+                            format!("lambda parameter {} needs a type here", p.name),
+                        );
                         Type::Unknown
                     }
                 },
             };
             param_tys.push(t);
         }
-        let declared_ret: Option<Vec<Type>> =
-            ret.as_ref().map(|rs| rs.iter().map(|t| self.resolve(t, line, col)).collect());
+        let declared_ret: Option<Vec<Type>> = ret
+            .as_ref()
+            .map(|rs| rs.iter().map(|t| self.resolve(t, line, col)).collect());
 
         let saved_ret = std::mem::take(&mut self.current_ret);
         let saved_loop = std::mem::replace(&mut self.loop_depth, 0);
@@ -1529,7 +1644,9 @@ fn assigned_idents(b: &Block, out: &mut Vec<String>) {
                     out.push(n.clone());
                 }
             }
-            StmtKind::If { then, elifs, els, .. } => {
+            StmtKind::If {
+                then, elifs, els, ..
+            } => {
                 assigned_idents(then, out);
                 for (_, b) in elifs {
                     assigned_idents(b, out);
@@ -1549,10 +1666,12 @@ fn assigned_idents(b: &Block, out: &mut Vec<String>) {
 fn contains_break(b: &Block) -> bool {
     b.iter().any(|s| match &s.kind {
         StmtKind::Break => true,
-        StmtKind::If { then, elifs, els, .. } => {
+        StmtKind::If {
+            then, elifs, els, ..
+        } => {
             contains_break(then)
                 || elifs.iter().any(|(_, b)| contains_break(b))
-                || els.as_ref().is_some_and(|b| contains_break(b))
+                || els.as_ref().is_some_and(contains_break)
         }
         // breaks inside nested loops belong to those loops
         _ => false,

@@ -65,7 +65,12 @@ fn errval(py: Python<'_>, e: PyErr) -> ErrVal {
         .traceback(py)
         .and_then(|t| t.format().ok())
         .unwrap_or_default();
-    ErrVal { msg: format!("{pytype}: {}", e.value(py)), cause: None, pytype, traceback }
+    ErrVal {
+        msg: format!("{pytype}: {}", e.value(py)),
+        cause: None,
+        pytype,
+        traceback,
+    }
 }
 
 /// The zero value of type `py`: a handle to Python's None. Operations on it
@@ -94,8 +99,7 @@ pub fn getattr(h: &PyHandle, name: &str) -> Result<Value, ErrVal> {
 
 pub fn call(h: &PyHandle, args: &[Value]) -> Result<Value, ErrVal> {
     Python::attach(|py| {
-        let converted: Result<Vec<Py<PyAny>>, ErrVal> =
-            args.iter().map(|a| to_py(py, a)).collect();
+        let converted: Result<Vec<Py<PyAny>>, ErrVal> = args.iter().map(|a| to_py(py, a)).collect();
         let tuple = PyTuple::new(py, converted?).map_err(|e| errval(py, e))?;
         h.0.bind(py)
             .call1(tuple)
@@ -139,7 +143,8 @@ pub fn binop(op: BinOp, l: &Value, r: &Value) -> Result<Value, ErrVal> {
                 })
             }
         };
-        res.map(|v| Value::Py(PyHandle::new(v.unbind()))).map_err(|e| errval(py, e))
+        res.map(|v| Value::Py(PyHandle::new(v.unbind())))
+            .map_err(|e| errval(py, e))
     })
 }
 
@@ -155,7 +160,10 @@ fn to_py(py: Python<'_>, v: &Value) -> Result<Py<PyAny>, ErrVal> {
         Value::List(items) => {
             let converted: Result<Vec<Py<PyAny>>, ErrVal> =
                 items.iter().map(|x| to_py(py, x)).collect();
-            PyList::new(py, converted?).map_err(|e| errval(py, e))?.into_any().unbind()
+            PyList::new(py, converted?)
+                .map_err(|e| errval(py, e))?
+                .into_any()
+                .unbind()
         }
         Value::Map(m) => {
             let d = PyDict::new(py);
@@ -168,10 +176,7 @@ fn to_py(py: Python<'_>, v: &Value) -> Result<Py<PyAny>, ErrVal> {
         }
         other => {
             return Err(ErrVal {
-                msg: format!(
-                    "cannot pass {} to python",
-                    crate::builtins::render(other)
-                ),
+                msg: format!("cannot pass {} to python", crate::builtins::render(other)),
                 ..Default::default()
             })
         }
@@ -184,7 +189,10 @@ fn to_py(py: Python<'_>, v: &Value) -> Result<Py<PyAny>, ErrVal> {
 pub fn extract(target: &str, h: &PyHandle) -> Result<Value, ErrVal> {
     Python::attach(|py| {
         let b = h.0.bind(py);
-        let fail = |msg: String| ErrVal { msg, ..Default::default() };
+        let fail = |msg: String| ErrVal {
+            msg,
+            ..Default::default()
+        };
         match target {
             "int" => b
                 .extract::<i64>()
@@ -222,14 +230,23 @@ pub fn extract(target: &str, h: &PyHandle) -> Result<Value, ErrVal> {
 fn extract_inner(py: Python<'_>, target: &str, h: &PyHandle) -> Result<Value, ErrVal> {
     let b = h.0.bind(py);
     match target {
-        "int" => b.extract::<i64>().map(Value::Int).map_err(|e| errval(py, e)),
-        "float" => b.extract::<f64>().map(Value::Float).map_err(|e| errval(py, e)),
+        "int" => b
+            .extract::<i64>()
+            .map(Value::Int)
+            .map_err(|e| errval(py, e)),
+        "float" => b
+            .extract::<f64>()
+            .map(Value::Float)
+            .map_err(|e| errval(py, e)),
         "bool" => b.is_truthy().map(Value::Bool).map_err(|e| errval(py, e)),
         "str" => b
             .str()
             .map(|s| Value::Str(s.to_string_lossy().to_string()))
             .map_err(|e| errval(py, e)),
-        _ => Err(ErrVal { msg: format!("cannot convert py to {target}"), ..Default::default() }),
+        _ => Err(ErrVal {
+            msg: format!("cannot convert py to {target}"),
+            ..Default::default()
+        }),
     }
 }
 

@@ -72,7 +72,10 @@ pub fn resolve_entry(file: Option<std::path::PathBuf>) -> Result<std::path::Path
     };
     let main = root.join("src").join("main.mg");
     if !main.exists() {
-        return Err(format!("no file given and project entrypoint {} is missing", main.display()));
+        return Err(format!(
+            "no file given and project entrypoint {} is missing",
+            main.display()
+        ));
     }
     Ok(main)
 }
@@ -83,7 +86,10 @@ pub fn check_source(path: &Path) -> RunResult {
 }
 
 fn compile_err(msg: impl Into<String>) -> RunResult {
-    RunResult { stdout: String::new(), exit: ExitKind::CompileError(msg.into()) }
+    RunResult {
+        stdout: String::new(),
+        exit: ExitKind::CompileError(msg.into()),
+    }
 }
 
 fn compile_and(path: &Path, run: bool) -> RunResult {
@@ -129,24 +135,40 @@ fn compile_and(path: &Path, run: bool) -> RunResult {
         // no project: bare interpreter, stdlib python only
     }
     if let Err(diags) = typecheck::check(&prog) {
-        let msg = diags.iter().map(|d| d.to_string()).collect::<Vec<_>>().join("\n");
+        let msg = diags
+            .iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
         return compile_err(msg);
     }
     if !run {
-        return RunResult { stdout: String::new(), exit: ExitKind::Ok };
+        return RunResult {
+            stdout: String::new(),
+            exit: ExitKind::Ok,
+        };
     }
     let mut interp = interp::Interp::new(&prog);
     let result = interp.run_main();
     let stdout = std::mem::take(&mut interp.out);
     match result {
-        Ok(None) => RunResult { stdout, exit: ExitKind::Ok },
-        Ok(Some(e)) => RunResult { stdout, exit: ExitKind::RuntimeError(e.msg) },
+        Ok(None) => RunResult {
+            stdout,
+            exit: ExitKind::Ok,
+        },
+        Ok(Some(e)) => RunResult {
+            stdout,
+            exit: ExitKind::RuntimeError(e.msg),
+        },
         Err(f) => {
             let mut msg = f.msg;
             for frame in f.stack.iter().rev() {
                 msg.push_str(&format!("\n  at {frame}"));
             }
-            RunResult { stdout, exit: ExitKind::RuntimeError(msg) }
+            RunResult {
+                stdout,
+                exit: ExitKind::RuntimeError(msg),
+            }
         }
     }
 }

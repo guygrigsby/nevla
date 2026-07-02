@@ -11,11 +11,20 @@ fn zero_response() -> Value {
     fields.insert("status".to_string(), Value::Int(0));
     fields.insert("body".to_string(), Value::Str(String::new()));
     fields.insert("headers".to_string(), Value::Map(IndexMap::new()));
-    Value::Struct { name: "Response".into(), fields }
+    Value::Struct {
+        name: "Response".into(),
+        fields,
+    }
 }
 
 fn fail(msg: String) -> Value {
-    Value::Tuple(vec![zero_response(), Value::Err(ErrVal { msg, ..Default::default() })])
+    Value::Tuple(vec![
+        zero_response(),
+        Value::Err(ErrVal {
+            msg,
+            ..Default::default()
+        }),
+    ])
 }
 
 struct Req {
@@ -30,7 +39,12 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
     let (ctx, req) = match (name, args.as_slice()) {
         ("get", [Value::Ctx(c), Value::Str(url)]) => (
             c.clone(),
-            Req { method: "GET".into(), url: url.clone(), body: None, headers: vec![] },
+            Req {
+                method: "GET".into(),
+                url: url.clone(),
+                body: None,
+                headers: vec![],
+            },
         ),
         ("post", [Value::Ctx(c), Value::Str(url), Value::Str(body)]) => (
             c.clone(),
@@ -41,9 +55,13 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
                 headers: vec![],
             },
         ),
-        ("request", [Value::Ctx(c), Value::Struct { name: sname, fields }])
-            if sname == "Request" =>
-        {
+        (
+            "request",
+            [Value::Ctx(c), Value::Struct {
+                name: sname,
+                fields,
+            }],
+        ) if sname == "Request" => {
             let (Some(Value::Str(method)), Some(Value::Str(url)), Some(Value::Str(body))) =
                 (fields.get("method"), fields.get("url"), fields.get("body"))
             else {
@@ -57,9 +75,20 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
                     }
                 }
             }
-            let body =
-                if body.is_empty() && method == "GET" { None } else { Some(body.clone()) };
-            (c.clone(), Req { method: method.clone(), url: url.clone(), body, headers })
+            let body = if body.is_empty() && method == "GET" {
+                None
+            } else {
+                Some(body.clone())
+            };
+            (
+                c.clone(),
+                Req {
+                    method: method.clone(),
+                    url: url.clone(),
+                    body,
+                    headers,
+                },
+            )
         }
         _ => return bad(interp),
     };
@@ -110,7 +139,10 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
     fields.insert("body".to_string(), Value::Str(body));
     fields.insert("headers".to_string(), Value::Map(headers));
     Ok(Value::Tuple(vec![
-        Value::Struct { name: "Response".into(), fields },
+        Value::Struct {
+            name: "Response".into(),
+            fields,
+        },
         Value::NoneV,
     ]))
 }
@@ -138,7 +170,10 @@ mod tests {
     }
 
     fn bg() -> Value {
-        Value::Ctx(Arc::new(CtxInner { deadline: None, interrupted: None }))
+        Value::Ctx(Arc::new(CtxInner {
+            deadline: None,
+            interrupted: None,
+        }))
     }
 
     fn run(name: &str, args: Vec<Value>) -> Value {
@@ -154,23 +189,32 @@ mod tests {
         );
         let v = run("get", vec![bg(), Value::Str(url)]);
         let Value::Tuple(ts) = v else { panic!() };
-        assert!(matches!(ts[1], Value::NoneV), "unexpected error: {:?}", ts[1]);
-        let Value::Struct { fields, .. } = &ts[0] else { panic!() };
+        assert!(
+            matches!(ts[1], Value::NoneV),
+            "unexpected error: {:?}",
+            ts[1]
+        );
+        let Value::Struct { fields, .. } = &ts[0] else {
+            panic!()
+        };
         assert!(matches!(fields["status"], Value::Int(200)));
         assert!(matches!(&fields["body"], Value::Str(b) if b == "ok"));
-        let Value::Map(h) = &fields["headers"] else { panic!() };
+        let Value::Map(h) = &fields["headers"] else {
+            panic!()
+        };
         assert!(matches!(&h[&MapKey::Str("x-test".into())], Value::Str(s) if s == "yes"));
     }
 
     #[test]
     fn non_2xx_is_a_response_not_an_error() {
-        let url = serve_once(
-            "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-        );
+        let url =
+            serve_once("HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
         let v = run("get", vec![bg(), Value::Str(url)]);
         let Value::Tuple(ts) = v else { panic!() };
         assert!(matches!(ts[1], Value::NoneV));
-        let Value::Struct { fields, .. } = &ts[0] else { panic!() };
+        let Value::Struct { fields, .. } = &ts[0] else {
+            panic!()
+        };
         assert!(matches!(fields["status"], Value::Int(404)));
     }
 
@@ -192,7 +236,10 @@ mod tests {
             deadline: Some(std::time::Instant::now()),
             interrupted: None,
         }));
-        let v = run("get", vec![expired, Value::Str("http://127.0.0.1:1/".into())]);
+        let v = run(
+            "get",
+            vec![expired, Value::Str("http://127.0.0.1:1/".into())],
+        );
         let Value::Tuple(ts) = v else { panic!() };
         match &ts[1] {
             Value::Err(e) => assert!(e.msg.contains("deadline"), "{}", e.msg),
@@ -202,13 +249,17 @@ mod tests {
 
     #[test]
     fn post_sends_body() {
-        let url = serve_once(
-            "HTTP/1.1 201 Created\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+        let url =
+            serve_once("HTTP/1.1 201 Created\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+        let v = run(
+            "post",
+            vec![bg(), Value::Str(url), Value::Str("payload".into())],
         );
-        let v = run("post", vec![bg(), Value::Str(url), Value::Str("payload".into())]);
         let Value::Tuple(ts) = v else { panic!() };
         assert!(matches!(ts[1], Value::NoneV));
-        let Value::Struct { fields, .. } = &ts[0] else { panic!() };
+        let Value::Struct { fields, .. } = &ts[0] else {
+            panic!()
+        };
         assert!(matches!(fields["status"], Value::Int(201)));
     }
 }

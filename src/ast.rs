@@ -115,13 +115,31 @@ pub struct Stmt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
-    Let { names: Vec<String>, expr: Expr },
-    Assign { target: Expr, expr: Expr },
+    Let {
+        names: Vec<String>,
+        expr: Expr,
+    },
+    Assign {
+        target: Expr,
+        expr: Expr,
+    },
     Expr(Expr),
     Return(Vec<Expr>),
-    If { cond: Expr, then: Block, elifs: Vec<(Expr, Block)>, els: Option<Block> },
-    ForIn { names: Vec<String>, iter: Expr, body: Block },
-    ForCond { cond: Option<Expr>, body: Block },
+    If {
+        cond: Expr,
+        then: Block,
+        elifs: Vec<(Expr, Block)>,
+        els: Option<Block>,
+    },
+    ForIn {
+        names: Vec<String>,
+        iter: Expr,
+        body: Block,
+    },
+    ForCond {
+        cond: Option<Expr>,
+        body: Block,
+    },
     Break,
     Continue,
 }
@@ -139,8 +157,18 @@ pub struct FnDecl {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decl {
     Fn(FnDecl),
-    Struct { name: String, fields: Vec<(String, TypeExpr)>, line: u32, col: u32 },
-    Import { path: String, py: bool, line: u32, col: u32 },
+    Struct {
+        name: String,
+        fields: Vec<(String, TypeExpr)>,
+        line: u32,
+        col: u32,
+    },
+    Import {
+        path: String,
+        py: bool,
+        line: u32,
+        col: u32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

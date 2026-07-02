@@ -70,7 +70,9 @@ impl Type {
         }
         match (self, value) {
             (_, Type::Unknown) | (Type::Unknown, _) => true,
-            (Type::Opt(inner), v) => inner.accepts(v) || matches!(v, Type::Opt(x) if inner.accepts(x)),
+            (Type::Opt(inner), v) => {
+                inner.accepts(v) || matches!(v, Type::Opt(x) if inner.accepts(x))
+            }
             (Type::List(a), Type::List(b)) => a.accepts(b),
             (Type::Map(ak, av), Type::Map(bk, bv)) => ak.accepts(bk) && av.accepts(bv),
             _ => false,

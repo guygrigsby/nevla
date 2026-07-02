@@ -13,7 +13,10 @@ pub enum Value {
     Str(String),
     List(Vec<Value>),
     Map(IndexMap<MapKey, Value>),
-    Struct { name: String, fields: IndexMap<String, Value> },
+    Struct {
+        name: String,
+        fields: IndexMap<String, Value>,
+    },
     /// The absent option value. Present option values are stored bare;
     /// the typechecker is what keeps them honest.
     NoneV,
@@ -99,24 +102,28 @@ impl Value {
             (Value::NoneV, Value::NoneV) => true,
             (Value::NoneV, _) | (_, Value::NoneV) => false,
             (Value::List(a), Value::List(b)) | (Value::Tuple(a), Value::Tuple(b)) => {
-                a.len() == b.len()
-                    && a.iter().zip(b).all(|(x, y)| x.eq_value(y))
+                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.eq_value(y))
             }
             (
-                Value::Struct { name: an, fields: af },
-                Value::Struct { name: bn, fields: bf },
+                Value::Struct {
+                    name: an,
+                    fields: af,
+                },
+                Value::Struct {
+                    name: bn,
+                    fields: bf,
+                },
             ) => {
                 an == bn
                     && af.len() == bf.len()
-                    && af.iter().all(|(k, v)| {
-                        bf.get(k).is_some_and(|w| v.eq_value(w))
-                    })
+                    && af
+                        .iter()
+                        .all(|(k, v)| bf.get(k).is_some_and(|w| v.eq_value(w)))
             }
             (Value::Map(a), Value::Map(b)) => {
                 a.len() == b.len()
-                    && a.iter().all(|(k, v)| {
-                        b.get(k).is_some_and(|w| v.eq_value(w))
-                    })
+                    && a.iter()
+                        .all(|(k, v)| b.get(k).is_some_and(|w| v.eq_value(w)))
             }
             _ => false,
         }

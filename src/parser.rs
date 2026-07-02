@@ -5,13 +5,22 @@ use crate::token::{Spanned, Token};
 
 pub fn parse(src: &str) -> Result<Program, Diag> {
     let toks = lex(src)?;
-    Parser { toks, pos: 0, depth: 0 }.program()
+    Parser {
+        toks,
+        pos: 0,
+        depth: 0,
+    }
+    .program()
 }
 
 /// Parse a single expression (repl).
 pub fn parse_expr(src: &str) -> Result<Expr, Diag> {
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, depth: 0 };
+    let mut p = Parser {
+        toks,
+        pos: 0,
+        depth: 0,
+    };
     let e = p.expr(true)?;
     p.skip_nl();
     if !p.at_end() {
@@ -57,7 +66,11 @@ impl Parser {
 
     fn err_here(&self, msg: &str) -> Diag {
         let (line, col) = self.here();
-        Diag { msg: msg.into(), line, col }
+        Diag {
+            msg: msg.into(),
+            line,
+            col,
+        }
     }
 
     fn enter(&mut self) -> Result<(), Diag> {
@@ -131,7 +144,12 @@ impl Parser {
                 self.bump();
                 let py = self.eat(&Token::Py);
                 match self.bump() {
-                    Some(Token::Str(path)) => Ok(Decl::Import { path, py, line, col }),
+                    Some(Token::Str(path)) => Ok(Decl::Import {
+                        path,
+                        py,
+                        line,
+                        col,
+                    }),
                     _ => Err(self.err_here("expected import path string")),
                 }
             }
@@ -152,7 +170,12 @@ impl Parser {
                     self.skip_nl();
                 }
                 self.expect(&Token::RBrace, "}")?;
-                Ok(Decl::Struct { name, fields, line, col })
+                Ok(Decl::Struct {
+                    name,
+                    fields,
+                    line,
+                    col,
+                })
             }
             Some(Token::Fn) => {
                 self.bump();
@@ -160,7 +183,14 @@ impl Parser {
                 let params = self.params()?;
                 let ret = self.ret_types()?;
                 let body = self.block()?;
-                Ok(Decl::Fn(FnDecl { name, params, ret, body, line, col }))
+                Ok(Decl::Fn(FnDecl {
+                    name,
+                    params,
+                    ret,
+                    body,
+                    line,
+                    col,
+                }))
             }
             _ => Err(self.err_here("expected fn, struct, or import")),
         }
@@ -172,7 +202,11 @@ impl Parser {
         let mut out = vec![];
         while self.peek() != Some(&Token::RParen) {
             let name = self.ident("parameter name")?;
-            let ty = if self.eat(&Token::Colon) { Some(self.type_expr()?) } else { None };
+            let ty = if self.eat(&Token::Colon) {
+                Some(self.type_expr()?)
+            } else {
+                None
+            };
             out.push(Param { name, ty });
             if !self.eat(&Token::Comma) {
                 break;
@@ -279,7 +313,9 @@ impl Parser {
                             if let Some(Token::Ident(_)) = self.peek2() {
                                 self.bump();
                                 let member = self.ident("type name")?;
-                                return Ok(self.maybe_opt(TypeExpr::Named(format!("{name}.{member}"))));
+                                return Ok(
+                                    self.maybe_opt(TypeExpr::Named(format!("{name}.{member}")))
+                                );
                             }
                         }
                         TypeExpr::Named(name)
@@ -329,7 +365,10 @@ impl Parser {
             Some(Token::Return) => {
                 self.bump();
                 let mut exprs = vec![];
-                if !matches!(self.peek(), Some(Token::Newline) | Some(Token::RBrace) | None) {
+                if !matches!(
+                    self.peek(),
+                    Some(Token::Newline) | Some(Token::RBrace) | None
+                ) {
                     exprs.push(self.expr(true)?);
                     while self.eat(&Token::Comma) {
                         self.skip_nl();
@@ -359,9 +398,14 @@ impl Parser {
                     let e = self.expr(true)?;
                     if self.eat(&Token::Eq) {
                         match e.kind {
-                            ExprKind::Ident(_) | ExprKind::Index { .. } | ExprKind::Field { .. } => {
+                            ExprKind::Ident(_)
+                            | ExprKind::Index { .. }
+                            | ExprKind::Field { .. } => {
                                 let rhs = self.expr(true)?;
-                                StmtKind::Assign { target: e, expr: rhs }
+                                StmtKind::Assign {
+                                    target: e,
+                                    expr: rhs,
+                                }
                             }
                             _ => return Err(self.err_here("cannot assign to this expression")),
                         }
@@ -417,7 +461,12 @@ impl Parser {
                 break;
             }
         }
-        Ok(StmtKind::If { cond, then, elifs, els })
+        Ok(StmtKind::If {
+            cond,
+            then,
+            elifs,
+            els,
+        })
     }
 
     fn for_stmt(&mut self) -> Result<StmtKind, Diag> {
@@ -433,7 +482,10 @@ impl Parser {
         }
         let cond = self.expr(false)?;
         let body = self.block()?;
-        Ok(StmtKind::ForCond { cond: Some(cond), body })
+        Ok(StmtKind::ForCond {
+            cond: Some(cond),
+            body,
+        })
     }
 
     // ---------- expressions ----------
@@ -473,7 +525,11 @@ impl Parser {
             self.skip_nl();
             let rhs = self.binary(prec + 1, struct_ok)?;
             lhs = Expr {
-                kind: ExprKind::Binary { op, lhs: Box::new(lhs), rhs: Box::new(rhs) },
+                kind: ExprKind::Binary {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                },
                 line,
                 col,
             };
@@ -494,17 +550,35 @@ impl Parser {
             Some(Token::Check) => {
                 self.bump();
                 let rhs = self.unary(struct_ok)?;
-                Ok(Expr { kind: ExprKind::Check(Box::new(rhs)), line, col })
+                Ok(Expr {
+                    kind: ExprKind::Check(Box::new(rhs)),
+                    line,
+                    col,
+                })
             }
             Some(Token::Bang) => {
                 self.bump();
                 let rhs = self.unary(struct_ok)?;
-                Ok(Expr { kind: ExprKind::Unary { op: UnOp::Not, rhs: Box::new(rhs) }, line, col })
+                Ok(Expr {
+                    kind: ExprKind::Unary {
+                        op: UnOp::Not,
+                        rhs: Box::new(rhs),
+                    },
+                    line,
+                    col,
+                })
             }
             Some(Token::Minus) => {
                 self.bump();
                 let rhs = self.unary(struct_ok)?;
-                Ok(Expr { kind: ExprKind::Unary { op: UnOp::Neg, rhs: Box::new(rhs) }, line, col })
+                Ok(Expr {
+                    kind: ExprKind::Unary {
+                        op: UnOp::Neg,
+                        rhs: Box::new(rhs),
+                    },
+                    line,
+                    col,
+                })
             }
             _ => self.postfix(struct_ok),
         }
@@ -521,17 +595,35 @@ impl Parser {
                     if self.peek() == Some(&Token::LParen) {
                         let args = self.call_args()?;
                         e = Expr {
-                            kind: ExprKind::Method { recv: Box::new(e), name, args },
+                            kind: ExprKind::Method {
+                                recv: Box::new(e),
+                                name,
+                                args,
+                            },
                             line,
                             col,
                         };
                     } else {
-                        e = Expr { kind: ExprKind::Field { recv: Box::new(e), name }, line, col };
+                        e = Expr {
+                            kind: ExprKind::Field {
+                                recv: Box::new(e),
+                                name,
+                            },
+                            line,
+                            col,
+                        };
                     }
                 }
                 Some(Token::LParen) => {
                     let args = self.call_args()?;
-                    e = Expr { kind: ExprKind::Call { callee: Box::new(e), args }, line, col };
+                    e = Expr {
+                        kind: ExprKind::Call {
+                            callee: Box::new(e),
+                            args,
+                        },
+                        line,
+                        col,
+                    };
                 }
                 Some(Token::LBracket) => {
                     self.bump();
@@ -553,7 +645,10 @@ impl Parser {
                         self.skip_nl();
                         self.expect(&Token::RBracket, "]")?;
                         e = Expr {
-                            kind: ExprKind::Index { recv: Box::new(e), idx: Box::new(first) },
+                            kind: ExprKind::Index {
+                                recv: Box::new(e),
+                                idx: Box::new(first),
+                            },
                             line,
                             col,
                         };
@@ -651,7 +746,10 @@ impl Parser {
                     if args.len() != 1 {
                         return Err(self.err_here("conversion takes one argument"));
                     }
-                    return Ok(mk(ExprKind::Conv { target, arg: Box::new(args.remove(0)) }));
+                    return Ok(mk(ExprKind::Conv {
+                        target,
+                        arg: Box::new(args.remove(0)),
+                    }));
                 }
                 if name == "list" && self.peek2() == Some(&Token::LBracket) {
                     let target = self.type_expr()?;
@@ -659,7 +757,10 @@ impl Parser {
                     if args.len() != 1 {
                         return Err(self.err_here("conversion takes one argument"));
                     }
-                    return Ok(mk(ExprKind::Conv { target, arg: Box::new(args.remove(0)) }));
+                    return Ok(mk(ExprKind::Conv {
+                        target,
+                        arg: Box::new(args.remove(0)),
+                    }));
                 }
                 if name == "map" && self.peek2() == Some(&Token::LBracket) {
                     let ty = self.type_expr()?;
@@ -732,7 +833,11 @@ mod tests {
         // 1 + 2 * 3 → 1 + (2 * 3)
         let e = expr("1 + 2 * 3");
         match e.kind {
-            E::Binary { op: BinOp::Add, rhs, .. } => {
+            E::Binary {
+                op: BinOp::Add,
+                rhs,
+                ..
+            } => {
                 assert!(matches!(rhs.kind, E::Binary { op: BinOp::Mul, .. }));
             }
             k => panic!("{k:?}"),
@@ -793,7 +898,10 @@ mod tests {
         let e = expr("list[int](t.shape)");
         match e.kind {
             E::Conv { target, .. } => {
-                assert_eq!(target, TypeExpr::List(Box::new(TypeExpr::Named("int".into()))));
+                assert_eq!(
+                    target,
+                    TypeExpr::List(Box::new(TypeExpr::Named("int".into())))
+                );
             }
             k => panic!("{k:?}"),
         }
@@ -841,8 +949,14 @@ mod tests {
         let f = one_fn(src);
         assert!(matches!(f.body[0].kind, StmtKind::ForIn { ref names, .. } if names.len() == 1));
         assert!(matches!(f.body[1].kind, StmtKind::ForIn { ref names, .. } if names.len() == 2));
-        assert!(matches!(f.body[2].kind, StmtKind::ForCond { cond: Some(_), .. }));
-        assert!(matches!(f.body[3].kind, StmtKind::ForCond { cond: None, .. }));
+        assert!(matches!(
+            f.body[2].kind,
+            StmtKind::ForCond { cond: Some(_), .. }
+        ));
+        assert!(matches!(
+            f.body[3].kind,
+            StmtKind::ForCond { cond: None, .. }
+        ));
     }
 
     #[test]
@@ -851,8 +965,18 @@ mod tests {
         assert_eq!(
             p.decls,
             vec![
-                Decl::Import { path: "http".into(), py: false, line: 1, col: 1 },
-                Decl::Import { path: "torch".into(), py: true, line: 2, col: 1 },
+                Decl::Import {
+                    path: "http".into(),
+                    py: false,
+                    line: 1,
+                    col: 1
+                },
+                Decl::Import {
+                    path: "torch".into(),
+                    py: true,
+                    line: 2,
+                    col: 1
+                },
             ]
         );
     }
@@ -901,7 +1025,11 @@ mod tests {
     fn deep_paren_nesting_errors_not_crashes() {
         let err = on_main_sized_stack(|| {
             let n = 50_000;
-            let src = format!("fn main() {{\n    x := {}1{}\n}}\n", "(".repeat(n), ")".repeat(n));
+            let src = format!(
+                "fn main() {{\n    x := {}1{}\n}}\n",
+                "(".repeat(n),
+                ")".repeat(n)
+            );
             parse(&src).unwrap_err()
         });
         assert!(err.msg.contains("too deeply nested"), "{}", err.msg);

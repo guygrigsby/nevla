@@ -37,7 +37,9 @@ fn main() -> ExitCode {
     match cli.cmd {
         Cmd::Run { file } => with_entry(file, |f| mongoose::report(mongoose::run_source(f))),
         Cmd::Check { file } => with_entry(file, |f| mongoose::report(mongoose::check_source(f))),
-        Cmd::Py { cmd: PyCmd::Add { package } } => py_add(&package),
+        Cmd::Py {
+            cmd: PyCmd::Add { package },
+        } => py_add(&package),
         Cmd::New { name } => new_project(&name),
         Cmd::Repl => {
             mongoose::repl::run();

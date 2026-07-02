@@ -4,7 +4,10 @@ use crate::interp::{Fault, Interp};
 use crate::value::{ErrVal, Value};
 
 fn err(msg: String) -> Value {
-    Value::Err(ErrVal { msg, ..Default::default() })
+    Value::Err(ErrVal {
+        msg,
+        ..Default::default()
+    })
 }
 
 fn fallible(v: Result<Value, String>, zero: Value) -> Value {
@@ -86,7 +89,8 @@ mod tests {
     use crate::value::Value;
 
     fn tempbase(tag: &str) -> String {
-        let dir = std::env::temp_dir().join(format!("mongoose-file-test-{}-{tag}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("mongoose-file-test-{}-{tag}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir.to_string_lossy().to_string()
@@ -95,7 +99,9 @@ mod tests {
     fn call(name: &str, args: Vec<Value>) -> Value {
         let prog = Program::default();
         let mut interp = Interp::new(&prog);
-        super::call(&mut interp, name, args).map_err(|f| f.msg).unwrap()
+        super::call(&mut interp, name, args)
+            .map_err(|f| f.msg)
+            .unwrap()
     }
 
     fn s(v: &str) -> Value {
@@ -106,8 +112,14 @@ mod tests {
     fn write_read_append_roundtrip() {
         let base = tempbase("rw");
         let p = format!("{base}/f.txt");
-        assert!(matches!(call("write", vec![s(&p), s("one\n")]), Value::NoneV));
-        assert!(matches!(call("append", vec![s(&p), s("two\n")]), Value::NoneV));
+        assert!(matches!(
+            call("write", vec![s(&p), s("one\n")]),
+            Value::NoneV
+        ));
+        assert!(matches!(
+            call("append", vec![s(&p), s("two\n")]),
+            Value::NoneV
+        ));
         match call("read", vec![s(&p)]) {
             Value::Tuple(ts) => {
                 assert!(matches!(&ts[0], Value::Str(x) if x == "one\ntwo\n"));
@@ -140,10 +152,19 @@ mod tests {
             },
             v => panic!("{v:?}"),
         }
-        assert!(matches!(call("remove", vec![s(&format!("{base}/z.txt"))]), Value::NoneV));
-        assert!(matches!(call("exists", vec![s(&format!("{base}/z.txt"))]), Value::Bool(false)));
+        assert!(matches!(
+            call("remove", vec![s(&format!("{base}/z.txt"))]),
+            Value::NoneV
+        ));
+        assert!(matches!(
+            call("exists", vec![s(&format!("{base}/z.txt"))]),
+            Value::Bool(false)
+        ));
         // removing a dir with contents fails as an error value, not a fault
-        assert!(matches!(call("remove", vec![s(&format!("{base}/a"))]), Value::Err(_)));
+        assert!(matches!(
+            call("remove", vec![s(&format!("{base}/a"))]),
+            Value::Err(_)
+        ));
     }
 
     #[test]

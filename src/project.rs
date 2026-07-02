@@ -18,7 +18,12 @@ pub const DEFAULT_PYTHON: &str = "3.12";
 impl Project {
     /// Walk up from `start` to the nearest directory holding mongoose.toml.
     pub fn find(start: &Path) -> Option<PathBuf> {
-        let mut dir = if start.is_dir() { start } else { start.parent()? }.to_path_buf();
+        let mut dir = if start.is_dir() {
+            start
+        } else {
+            start.parent()?
+        }
+        .to_path_buf();
         loop {
             if dir.join("mongoose.toml").exists() {
                 return Some(dir);
@@ -31,8 +36,7 @@ impl Project {
 
     pub fn load(root: &Path) -> Result<Project, String> {
         let path = root.join("mongoose.toml");
-        let src = std::fs::read_to_string(&path)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+        let src = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         let doc: toml::Table =
             toml::from_str(&src).map_err(|e| format!("{}: {e}", path.display()))?;
         let name = doc
@@ -53,7 +57,12 @@ impl Project {
                 py_deps.insert(k.clone(), v.as_str().unwrap_or("*").to_string());
             }
         }
-        Ok(Project { root: root.to_path_buf(), name, python, py_deps })
+        Ok(Project {
+            root: root.to_path_buf(),
+            name,
+            python,
+            py_deps,
+        })
     }
 
     pub fn save(&self) -> Result<(), String> {
@@ -96,9 +105,15 @@ impl Project {
         use std::process::Stdio;
         let mut cmd = Command::new(uv_bin);
         cmd.args(args).current_dir(&self.root);
-        cmd.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() });
+        cmd.stdin(if stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        });
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-        let mut child = cmd.spawn().map_err(|e| format!("uv: {e} (is uv installed?)"))?;
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("uv: {e} (is uv installed?)"))?;
         if let Some(input) = stdin {
             child
                 .stdin
@@ -165,12 +180,22 @@ impl Project {
                 }
             }
         } else {
-            self.uv(uv_bin, &["venv", ".mongoose/venv", "--python", &self.python], None)?;
+            self.uv(
+                uv_bin,
+                &["venv", ".mongoose/venv", "--python", &self.python],
+                None,
+            )?;
         }
         let py = self.venv().join("bin").join("python");
         self.uv(
             uv_bin,
-            &["pip", "sync", "--python", &py.to_string_lossy(), "mongoose.lock"],
+            &[
+                "pip",
+                "sync",
+                "--python",
+                &py.to_string_lossy(),
+                "mongoose.lock",
+            ],
             None,
         )?;
         std::fs::create_dir_all(marker.parent().unwrap()).ok();
@@ -179,7 +204,9 @@ impl Project {
     }
 
     pub fn py_add(&mut self, pkg: &str, uv_bin: &str) -> Result<(), String> {
-        self.py_deps.entry(pkg.to_string()).or_insert_with(|| "*".to_string());
+        self.py_deps
+            .entry(pkg.to_string())
+            .or_insert_with(|| "*".to_string());
         self.save()?;
         self.compile_lock(uv_bin)?;
         self.ensure_env(uv_bin)

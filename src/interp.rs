@@ -84,10 +84,7 @@ impl<'p> Interp<'p> {
                         globals.insert(path.clone(), Value::Module(path.clone()));
                         if path == "http" {
                             let s = |n: &str| TypeExpr::Named(n.into());
-                            let headers = TypeExpr::Map(
-                                Box::new(s("str")),
-                                Box::new(s("str")),
-                            );
+                            let headers = TypeExpr::Map(Box::new(s("str")), Box::new(s("str")));
                             structs.insert(
                                 "Request".into(),
                                 vec![
@@ -127,7 +124,10 @@ impl<'p> Interp<'p> {
     }
 
     pub(crate) fn fault(&self, msg: impl Into<String>) -> Fault {
-        Fault { msg: msg.into(), stack: self.call_stack.clone() }
+        Fault {
+            msg: msg.into(),
+            stack: self.call_stack.clone(),
+        }
     }
 
     /// Run fn main. Returns main's error value if it returned one.
@@ -137,9 +137,7 @@ impl<'p> Interp<'p> {
                 Ok(h) => {
                     self.globals.insert(m, Value::Py(h));
                 }
-                Err(e) => {
-                    return Err(self.fault(format!("import py \"{m}\": {}", e.msg)))
-                }
+                Err(e) => return Err(self.fault(format!("import py \"{m}\": {}", e.msg))),
             }
         }
         let v = self.call_named("main", vec![])?;
@@ -283,12 +281,11 @@ impl<'p> Interp<'p> {
                         Ok(h) => {
                             self.globals.insert(path.clone(), Value::Py(h));
                         }
-                        Err(e) => {
-                            return Err(self.fault(format!("import py {path:?}: {}", e.msg)))
-                        }
+                        Err(e) => return Err(self.fault(format!("import py {path:?}: {}", e.msg))),
                     }
                 } else {
-                    self.globals.insert(path.clone(), Value::Module(path.clone()));
+                    self.globals
+                        .insert(path.clone(), Value::Module(path.clone()));
                 }
             }
         }
@@ -409,7 +406,12 @@ impl<'p> Interp<'p> {
                 };
                 Ok(Flow::Return(v))
             }
-            StmtKind::If { cond, then, elifs, els } => {
+            StmtKind::If {
+                cond,
+                then,
+                elifs,
+                els,
+            } => {
                 if truthy(&sval!(self.eval(cond))) {
                     return self.exec_block(then);
                 }
@@ -427,9 +429,7 @@ impl<'p> Interp<'p> {
                 let it = sval!(self.eval(iter));
                 let rounds: Vec<Vec<Value>> = match it {
                     Value::List(items) => items.into_iter().map(|v| vec![v]).collect(),
-                    Value::Map(m) => {
-                        m.into_iter().map(|(k, v)| vec![k.to_value(), v]).collect()
-                    }
+                    Value::Map(m) => m.into_iter().map(|(k, v)| vec![k.to_value(), v]).collect(),
                     _ => return Err(self.fault("cannot iterate this value")),
                 };
                 for round in rounds {
@@ -500,7 +500,10 @@ impl<'p> Interp<'p> {
                     };
                     // descend
                     let stack = self.call_stack.clone();
-                    let flt = |msg: &str| Fault { msg: msg.into(), stack: stack.clone() };
+                    let flt = |msg: &str| Fault {
+                        msg: msg.into(),
+                        stack: stack.clone(),
+                    };
                     let n = steps.len();
                     for (i, st) in steps.into_iter().enumerate() {
                         let last = i + 1 == n;
@@ -539,9 +542,7 @@ impl<'p> Interp<'p> {
                                         None => return Err(flt("missing key")),
                                     }
                                 }
-                                Value::Str(_) => {
-                                    return Err(flt("cannot assign into a string"))
-                                }
+                                Value::Str(_) => return Err(flt("cannot assign into a string")),
                                 _ => return Err(flt("cannot index this value")),
                             },
                         }
@@ -627,7 +628,10 @@ impl<'p> Interp<'p> {
                         None => return Err(self.fault(format!("missing field: {f}"))),
                     }
                 }
-                ok(Value::Struct { name: name.clone(), fields: out })
+                ok(Value::Struct {
+                    name: name.clone(),
+                    fields: out,
+                })
             }
             K::Unary { op, rhs } => {
                 let v = val!(self.eval(rhs));
@@ -803,10 +807,7 @@ impl<'p> Interp<'p> {
                     Ev::V(v) => v,
                     r @ Ev::Ret(_) => return Ok(r),
                     Ev::PyErr(e) => {
-                        return Ok(Ev::V(Value::Tuple(vec![
-                            self.zero(target),
-                            Value::Err(e),
-                        ])))
+                        return Ok(Ev::V(Value::Tuple(vec![self.zero(target), Value::Err(e)])))
                     }
                 };
                 self.convert(target, v).map(Ev::V)
@@ -868,7 +869,10 @@ impl<'p> Interp<'p> {
 
     fn field(&mut self, r: Value, name: &str) -> Result<Value, Fault> {
         match r {
-            Value::Struct { fields, name: sname } => fields
+            Value::Struct {
+                fields,
+                name: sname,
+            } => fields
                 .get(name)
                 .cloned()
                 .ok_or_else(|| self.fault(format!("{sname} has no field {name}"))),
@@ -940,9 +944,10 @@ impl<'p> Interp<'p> {
     fn error_builtin(&mut self, name: &str, mut args: Vec<Value>) -> Result<Value, Fault> {
         match name {
             "new" => match args.pop() {
-                Some(Value::Str(msg)) => {
-                    Ok(Value::Err(ErrVal { msg, ..Default::default() }))
-                }
+                Some(Value::Str(msg)) => Ok(Value::Err(ErrVal {
+                    msg,
+                    ..Default::default()
+                })),
                 _ => Err(self.fault("error.new needs a str")),
             },
             "wrap" => {
@@ -976,7 +981,10 @@ impl<'p> Interp<'p> {
                         for (f, ft) in fields {
                             out.insert(f.clone(), self.zero(ft));
                         }
-                        Value::Struct { name: s.to_string(), fields: out }
+                        Value::Struct {
+                            name: s.to_string(),
+                            fields: out,
+                        }
                     }
                     None => Value::Unit,
                 },
