@@ -1,10 +1,13 @@
 pub mod ast;
+pub mod builtins;
 pub mod diag;
+pub mod interp;
 pub mod lexer;
 pub mod parser;
 pub mod token;
 pub mod typecheck;
 pub mod types;
+pub mod value;
 
 use std::path::Path;
 
@@ -40,8 +43,18 @@ pub fn run_source(path: &Path) -> RunResult {
         let msg = diags.iter().map(|d| d.to_string()).collect::<Vec<_>>().join("\n");
         return RunResult { stdout: String::new(), exit: ExitKind::CompileError(msg) };
     }
-    RunResult {
-        stdout: String::new(),
-        exit: ExitKind::RuntimeError("no evaluator yet".into()),
+    let mut interp = interp::Interp::new(&prog);
+    let result = interp.run_main();
+    let stdout = std::mem::take(&mut interp.out);
+    match result {
+        Ok(None) => RunResult { stdout, exit: ExitKind::Ok },
+        Ok(Some(e)) => RunResult { stdout, exit: ExitKind::RuntimeError(e.msg) },
+        Err(f) => {
+            let mut msg = f.msg;
+            for frame in f.stack.iter().rev() {
+                msg.push_str(&format!("\n  at {frame}"));
+            }
+            RunResult { stdout, exit: ExitKind::RuntimeError(msg) }
+        }
     }
 }

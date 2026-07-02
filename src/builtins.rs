@@ -1,0 +1,202 @@
+use crate::ast::TypeExpr;
+use crate::interp::{Fault, Interp};
+use crate::value::{ErrVal, Value};
+
+impl Interp<'_> {
+    pub(crate) fn builtin_call(&mut self, name: &str, args: Vec<Value>) -> Result<Value, Fault> {
+        match name {
+            "print" => {
+                let line = args.iter().map(render).collect::<Vec<_>>().join(" ");
+                self.out.push_str(&line);
+                self.out.push('\n');
+                Ok(Value::Unit)
+            }
+            "printf" | "sprintf" => {
+                let Some(Value::Str(fmt)) = args.first() else {
+                    return Err(self.fault(format!("{name} needs a format string")));
+                };
+                let s = self.format(fmt.clone(), &args[1..])?;
+                if name == "printf" {
+                    self.out.push_str(&s);
+                    Ok(Value::Unit)
+                } else {
+                    Ok(Value::Str(s))
+                }
+            }
+            "len" => match args.first() {
+                Some(Value::Str(s)) => Ok(Value::Int(s.chars().count() as i64)),
+                Some(Value::List(v)) => Ok(Value::Int(v.len() as i64)),
+                Some(Value::Map(m)) => Ok(Value::Int(m.len() as i64)),
+                _ => Err(self.fault("len needs str, list, or map")),
+            },
+            "range" => {
+                let (lo, hi) = match args.as_slice() {
+                    [Value::Int(n)] => (0, *n),
+                    [Value::Int(a), Value::Int(b)] => (*a, *b),
+                    _ => return Err(self.fault("range needs int arguments")),
+                };
+                Ok(Value::List((lo..hi.max(lo)).map(Value::Int).collect()))
+            }
+            _ => Err(self.fault(format!("unknown function: {name}"))),
+        }
+    }
+
+    /// Fallible conversions: always (T, error?).
+    pub(crate) fn convert(&mut self, target: &TypeExpr, v: Value) -> Result<Value, Fault> {
+        let ok = |v| Ok(Value::Tuple(vec![v, Value::NoneV]));
+        let fail = |this: &Self, t: &TypeExpr, msg: String| {
+            Ok(Value::Tuple(vec![this.zero(t), Value::Err(ErrVal { msg, ..Default::default() })]))
+        };
+        let name = match target {
+            TypeExpr::Named(n) => n.as_str(),
+            TypeExpr::List(_) => "list",
+            _ => return Err(self.fault("bad conversion target")),
+        };
+        match (name, v) {
+            ("int", Value::Int(i)) => ok(Value::Int(i)),
+            ("int", Value::Float(f)) => ok(Value::Int(f as i64)),
+            ("int", Value::Str(s)) => match s.trim().parse::<i64>() {
+                Ok(i) => ok(Value::Int(i)),
+                Err(_) => fail(self, target, format!("cannot parse {s:?} as int")),
+            },
+            ("float", Value::Float(f)) => ok(Value::Float(f)),
+            ("float", Value::Int(i)) => ok(Value::Float(i as f64)),
+            ("float", Value::Str(s)) => match s.trim().parse::<f64>() {
+                Ok(f) => ok(Value::Float(f)),
+                Err(_) => fail(self, target, format!("cannot parse {s:?} as float")),
+            },
+            ("bool", Value::Bool(b)) => ok(Value::Bool(b)),
+            ("bool", Value::Str(s)) => match s.trim() {
+                "true" => ok(Value::Bool(true)),
+                "false" => ok(Value::Bool(false)),
+                _ => fail(self, target, format!("cannot parse {s:?} as bool")),
+            },
+            ("str", v) => ok(Value::Str(render(&v))),
+            ("list", Value::List(items)) => ok(Value::List(items)),
+            // py conversions land with the bridge
+            (t, v) => fail(self, target, format!("cannot convert {} to {t}", render(&v))),
+        }
+    }
+
+    pub(crate) fn method_call(
+        &mut self,
+        recv: Value,
+        name: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, Fault> {
+        match recv {
+            Value::Module(m) => self.module_call(&m, name, args),
+            _ => Err(self.fault(format!("no method {name} on this value"))),
+        }
+    }
+
+    pub(crate) fn module_call(
+        &mut self,
+        module: &str,
+        name: &str,
+        _args: Vec<Value>,
+    ) -> Result<Value, Fault> {
+        Err(self.fault(format!("{module}.{name} is not implemented yet")))
+    }
+
+    pub(crate) fn module_const(&mut self, module: &str, name: &str) -> Result<Value, Fault> {
+        Err(self.fault(format!("{module}.{name} is not implemented yet")))
+    }
+
+    fn format(&self, fmt: String, args: &[Value]) -> Result<String, Fault> {
+        let mut out = String::new();
+        let mut chars = fmt.chars().peekable();
+        let mut next = 0usize;
+        while let Some(c) = chars.next() {
+            if c != '%' {
+                out.push(c);
+                continue;
+            }
+            if chars.peek() == Some(&'%') {
+                chars.next();
+                out.push('%');
+                continue;
+            }
+            // width and precision
+            let mut width = String::new();
+            while chars.peek().is_some_and(|d| d.is_ascii_digit()) {
+                width.push(chars.next().unwrap());
+            }
+            let mut prec: Option<usize> = None;
+            if chars.peek() == Some(&'.') {
+                chars.next();
+                let mut p = String::new();
+                while chars.peek().is_some_and(|d| d.is_ascii_digit()) {
+                    p.push(chars.next().unwrap());
+                }
+                prec = p.parse().ok();
+            }
+            let verb = chars
+                .next()
+                .ok_or_else(|| self.fault("printf: format ends inside a verb"))?;
+            let arg = args
+                .get(next)
+                .ok_or_else(|| self.fault("printf: wrong argument count"))?;
+            next += 1;
+            let rendered = match (verb, arg) {
+                ('v', v) => render(v),
+                ('d', Value::Int(i)) => i.to_string(),
+                ('s', Value::Str(s)) => s.clone(),
+                ('t', Value::Bool(b)) => b.to_string(),
+                ('q', Value::Str(s)) => format!("{s:?}"),
+                ('f', Value::Float(f)) => match prec {
+                    Some(p) => format!("{f:.p$}"),
+                    None => format!("{f:.6}"),
+                },
+                (v, _) => {
+                    return Err(self.fault(format!("printf: bad argument for %{v}")));
+                }
+            };
+            let w: usize = width.parse().unwrap_or(0);
+            if rendered.len() < w {
+                out.push_str(&" ".repeat(w - rendered.len()));
+            }
+            out.push_str(&rendered);
+        }
+        if next != args.len() {
+            return Err(self.fault("printf: wrong argument count"));
+        }
+        Ok(out)
+    }
+}
+
+/// Canonical rendering, shared by print, %v, and str().
+pub fn render(v: &Value) -> String {
+    match v {
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Str(s) => s.clone(),
+        Value::List(items) => {
+            let inner = items.iter().map(render).collect::<Vec<_>>().join(", ");
+            format!("[{inner}]")
+        }
+        Value::Map(m) => {
+            let inner = m
+                .iter()
+                .map(|(k, v)| format!("{}: {}", render(&k.to_value()), render(v)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{{{inner}}}")
+        }
+        Value::Struct { name, fields } => {
+            let inner = fields
+                .iter()
+                .map(|(k, v)| format!("{k}: {}", render(v)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{name}{{{inner}}}")
+        }
+        Value::NoneV => "none".into(),
+        Value::Err(e) => format!("error({})", e.msg),
+        Value::Fn(_) => "fn".into(),
+        Value::Module(m) => format!("module {m}"),
+        Value::Tuple(items) => items.iter().map(render).collect::<Vec<_>>().join(", "),
+        Value::Unit => "()".into(),
+    }
+}
