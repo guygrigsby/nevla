@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
 use crate::diag::Diag;
@@ -157,6 +157,27 @@ impl Checker {
                 self.structs.insert(name.clone(), fs);
             }
         }
+        // a by-value field cycle can never be constructed; an option, list,
+        // or map along the way breaks the cycle
+        for d in &prog.decls {
+            if let Decl::Struct { name, line, col, .. } = d {
+                let cycle = self.structs.get(name).into_iter().flatten().find_map(|(f, t)| {
+                    match t {
+                        Type::Struct(s) if s == name || self.reaches_by_value(s, name) => {
+                            Some((f.clone(), s.clone()))
+                        }
+                        _ => None,
+                    }
+                });
+                if let Some((field, fty)) = cycle {
+                    self.diag(
+                        *line,
+                        *col,
+                        format!("recursive struct {name}: use an option ({field}: {fty}?)"),
+                    );
+                }
+            }
+        }
         for d in &prog.decls {
             if let Decl::Fn(f) = d {
                 let mut params = vec![];
@@ -192,6 +213,27 @@ impl Checker {
                 }
             }
         }
+    }
+
+    /// Whether struct `from` holds a `target` by value, transitively through
+    /// struct-typed fields only.
+    fn reaches_by_value(&self, from: &str, target: &str) -> bool {
+        let mut seen = HashSet::new();
+        let mut stack = vec![from.to_string()];
+        while let Some(s) = stack.pop() {
+            if !seen.insert(s.clone()) {
+                continue;
+            }
+            for (_, t) in self.structs.get(&s).into_iter().flatten() {
+                if let Type::Struct(next) = t {
+                    if next == target {
+                        return true;
+                    }
+                    stack.push(next.clone());
+                }
+            }
+        }
+        false
     }
 
     fn resolve(&mut self, t: &TypeExpr, line: u32, col: u32) -> Type {
