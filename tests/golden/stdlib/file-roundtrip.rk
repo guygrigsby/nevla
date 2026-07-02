@@ -1,0 +1,18 @@
+import "file"
+
+fn main() (error?) {
+    d := "/tmp/rikki-golden-file"
+    check file.mkdir(d)
+    p := d + "/rt.txt"
+    check file.write(p, "one\n")
+    check file.append(p, "two")
+    print(file.exists(p))
+    s := check file.read(p)
+    print(s)
+    names := check file.list(d)
+    print(names.contains("rt.txt"))
+    check file.remove(p)
+    print(file.exists(p))
+    check file.remove(d)
+    return none
+}

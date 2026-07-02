@@ -1,0 +1,11 @@
+import "error"
+
+fn main() {
+    e := error.new("boom")
+    w := error.wrap(e, "outer")
+    print(w.msg)
+    c := w.cause
+    if c != none {
+        print(c.msg)
+    }
+}

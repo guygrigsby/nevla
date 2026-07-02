@@ -9,4 +9,6 @@ fn main() {
     if e != none {
         print(e.msg)
     }
+    i := ctx.interrupt(c)
+    print(i.done())
 }
