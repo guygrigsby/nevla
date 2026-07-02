@@ -222,69 +222,71 @@ fn to_py(py: Python<'_>, v: &Value) -> Result<Py<PyAny>, ErrVal> {
     Ok(obj)
 }
 
+/// Python → rikki extraction target (spec 13.5), typed so the caller cannot
+/// hand the bridge a spec it parses differently.
+pub enum ConvTarget {
+    Int,
+    Float,
+    Bool,
+    Str,
+    /// `[]T(x)`: elements extracted per `Elem`.
+    List(Elem),
+    /// A target extraction can never satisfy (an unknown named type, py,
+    /// ...); always fails with an error value naming it.
+    Other(String),
+}
+
+/// Element target of a list extraction; `Py` keeps elements as handles.
+pub enum Elem {
+    Int,
+    Float,
+    Bool,
+    Str,
+    Py,
+}
+
 /// Python → rikki extraction for the fallible conversions.
-/// `target` is "int" | "float" | "bool" | "str" | "list:<elem>".
-pub fn extract(target: &str, h: &PyHandle) -> Result<Value, ErrVal> {
+pub fn extract(target: &ConvTarget, h: &PyHandle) -> Result<Value, ErrVal> {
     Python::attach(|py| {
         let b = h.0.bind(py);
-        let fail = |msg: String| ErrVal {
-            msg,
-            ..Default::default()
-        };
         match target {
-            "int" => b
-                .extract::<i64>()
-                .map(Value::Int)
-                .map_err(|e| errval(py, e)),
-            "float" => b
-                .extract::<f64>()
-                .map(Value::Float)
-                .map_err(|e| errval(py, e)),
-            "bool" => b.is_truthy().map(Value::Bool).map_err(|e| errval(py, e)),
-            "str" => b
-                .str()
-                .map(|s| Value::Str(s.to_string_lossy().to_string()))
-                .map_err(|e| errval(py, e)),
-            t if t.starts_with("list:") => {
-                let elem = &t[5..];
+            ConvTarget::Int => scalar(py, &Elem::Int, b),
+            ConvTarget::Float => scalar(py, &Elem::Float, b),
+            ConvTarget::Bool => scalar(py, &Elem::Bool, b),
+            ConvTarget::Str => scalar(py, &Elem::Str, b),
+            ConvTarget::List(elem) => {
                 let mut out = vec![];
                 let iter = b.try_iter().map_err(|e| errval(py, e))?;
                 for item in iter {
                     let item = item.map_err(|e| errval(py, e))?;
-                    let handle = PyHandle::new(item.unbind());
-                    let v = match elem {
-                        "py" => Value::Py(handle),
-                        _ => extract_inner(py, elem, &handle)?,
-                    };
-                    out.push(v);
+                    out.push(scalar(py, elem, &item)?);
                 }
                 Ok(Value::List(out))
             }
-            _ => Err(fail(format!("cannot convert py to {target}"))),
+            ConvTarget::Other(name) => Err(ErrVal {
+                msg: format!("cannot convert py to {name}"),
+                ..Default::default()
+            }),
         }
     })
 }
 
-fn extract_inner(py: Python<'_>, target: &str, h: &PyHandle) -> Result<Value, ErrVal> {
-    let b = h.0.bind(py);
-    match target {
-        "int" => b
+fn scalar(py: Python<'_>, kind: &Elem, b: &Bound<'_, PyAny>) -> Result<Value, ErrVal> {
+    match kind {
+        Elem::Int => b
             .extract::<i64>()
             .map(Value::Int)
             .map_err(|e| errval(py, e)),
-        "float" => b
+        Elem::Float => b
             .extract::<f64>()
             .map(Value::Float)
             .map_err(|e| errval(py, e)),
-        "bool" => b.is_truthy().map(Value::Bool).map_err(|e| errval(py, e)),
-        "str" => b
+        Elem::Bool => b.is_truthy().map(Value::Bool).map_err(|e| errval(py, e)),
+        Elem::Str => b
             .str()
             .map(|s| Value::Str(s.to_string_lossy().to_string()))
             .map_err(|e| errval(py, e)),
-        _ => Err(ErrVal {
-            msg: format!("cannot convert py to {target}"),
-            ..Default::default()
-        }),
+        Elem::Py => Ok(Value::Py(PyHandle::new(b.clone().unbind()))),
     }
 }
 

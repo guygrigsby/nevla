@@ -112,10 +112,24 @@ impl Interp<'_> {
         };
         // py extraction goes through the bridge
         if let Value::Py(h) = &v {
+            use crate::bridge::{ConvTarget, Elem};
             let spec = match target {
-                TypeExpr::Named(n) => n.clone(),
+                TypeExpr::Named(n) => match n.as_str() {
+                    "int" => ConvTarget::Int,
+                    "float" => ConvTarget::Float,
+                    "bool" => ConvTarget::Bool,
+                    "str" => ConvTarget::Str,
+                    other => ConvTarget::Other(other.to_string()),
+                },
                 TypeExpr::List(inner) => match &**inner {
-                    TypeExpr::Named(n) => format!("list:{n}"),
+                    TypeExpr::Named(n) => match n.as_str() {
+                        "int" => ConvTarget::List(Elem::Int),
+                        "float" => ConvTarget::List(Elem::Float),
+                        "bool" => ConvTarget::List(Elem::Bool),
+                        "str" => ConvTarget::List(Elem::Str),
+                        "py" => ConvTarget::List(Elem::Py),
+                        other => ConvTarget::Other(other.to_string()),
+                    },
                     _ => return Err(self.fault("unsupported list conversion from py")),
                 },
                 _ => return Err(self.fault("bad conversion target")),
