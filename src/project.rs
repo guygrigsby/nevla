@@ -71,16 +71,20 @@ impl Project {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        let mut out = String::new();
-        out.push_str("[project]\n");
-        out.push_str(&format!("name = {:?}\n", self.name));
-        out.push_str(&format!("python = {:?}\n", self.python));
+        let s = |v: &str| toml::Value::String(v.to_string());
+        let mut project = toml::Table::new();
+        project.insert("name".into(), s(&self.name));
+        project.insert("python".into(), s(&self.python));
+        let mut doc = toml::Table::new();
+        doc.insert("project".into(), toml::Value::Table(project));
         if !self.py_deps.is_empty() {
-            out.push_str("\n[py-deps]\n");
+            let mut deps = toml::Table::new();
             for (k, v) in &self.py_deps {
-                out.push_str(&format!("{k} = {v:?}\n"));
+                deps.insert(k.clone(), s(v));
             }
+            doc.insert("py-deps".into(), toml::Value::Table(deps));
         }
+        let out = toml::to_string(&doc).map_err(|e| format!("serialize rikki.toml: {e}"))?;
         std::fs::write(self.root.join("rikki.toml"), out)
             .map_err(|e| format!("write rikki.toml: {e}"))
     }
@@ -263,6 +267,25 @@ mod tests {
         assert_eq!(q.name, "hello");
         assert_eq!(q.python, "3.12");
         assert_eq!(q.py_deps.get("torch").map(String::as_str), Some("*"));
+    }
+
+    #[test]
+    fn toml_roundtrip_dotted_dep() {
+        // PyPI has dotted package names (ruamel.yaml); a bare key would
+        // parse back as a nested table and corrupt the dep list
+        let d = tempdir("toml-dot");
+        let p = Project {
+            root: d.clone(),
+            name: "hello".into(),
+            python: "3.12".into(),
+            py_deps: [("ruamel.yaml".to_string(), "0.18".to_string())].into(),
+        };
+        p.save().unwrap();
+        let q = Project::load(&d).unwrap();
+        assert_eq!(
+            q.py_deps.get("ruamel.yaml").map(String::as_str),
+            Some("0.18")
+        );
     }
 
     #[test]
