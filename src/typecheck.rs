@@ -1397,7 +1397,14 @@ impl Checker {
             },
             Type::Module(m) if matches!(self.imports.get(m), Some(ImportKind::File(_))) => {
                 match self.fns.get(&format!("{m}.{name}")) {
-                    Some((args, rets)) => Type::Fn(args.clone(), rets.clone()),
+                    Some(_) => {
+                        self.diag(
+                            line,
+                            col,
+                            format!("module functions are not first class in v1; call {m}.{name}(...) directly"),
+                        );
+                        Type::Unknown
+                    }
                     None => {
                         self.diag(line, col, format!("{m} has no member {name}"));
                         Type::Unknown
@@ -1406,7 +1413,14 @@ impl Checker {
             }
             Type::Module(m) => match std_member(m, name) {
                 Some(Member::Const(t)) => t,
-                Some(Member::Fn(args, rets)) => Type::Fn(args, rets),
+                Some(Member::Fn(..)) => {
+                    self.diag(
+                        line,
+                        col,
+                        format!("module functions are not first class in v1; call {m}.{name}(...) directly"),
+                    );
+                    Type::Unknown
+                }
                 None => {
                     self.diag(line, col, format!("{m} has no member {name}"));
                     Type::Unknown

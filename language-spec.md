@@ -713,8 +713,7 @@ Arguments   = "(" { newline } [ ExpressionList [ "," ] ] { newline } ")" .
 - a member of a module: a stdlib constant (`math.pi`, `math.e`) reads as its
   value; a module function member (stdlib or file module) must be called
   directly (`math.sqrt(4.0)`, `util.double(3)`). Module functions are not
-  first class in v1: `f := math.sqrt` passes the type checker but faults at
-  runtime;
+  first class in v1: `f := math.sqrt` is a compile-time error;
 - a Python attribute, when `x` has type `py` (chapter 13).
 
 Selecting through an option type is a compile-time error; narrow first
