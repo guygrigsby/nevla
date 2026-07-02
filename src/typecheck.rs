@@ -1116,6 +1116,23 @@ impl Checker {
                         }
                         return ExprTy::One(Type::Int);
                     }
+                    "args" => {
+                        if !args.is_empty() {
+                            self.diag(line, col, "args takes no arguments");
+                        }
+                        return ExprTy::One(Type::List(Box::new(Type::Str)));
+                    }
+                    "input" => {
+                        if args.len() != 1 {
+                            self.diag(line, col, "input takes one str prompt");
+                        } else {
+                            let t = self.expr_one(&args[0], Some(&Type::Str));
+                            if !matches!(t, Type::Str | Type::Unknown) {
+                                self.diag(line, col, format!("input prompt must be str, got {t}"));
+                            }
+                        }
+                        return ExprTy::Multi(vec![Type::Str, err_opt()]);
+                    }
                     "range" => {
                         if args.is_empty() || args.len() > 2 {
                             self.diag(line, col, "range takes one or two arguments");

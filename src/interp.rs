@@ -6,6 +6,33 @@ use indexmap::IndexMap;
 use crate::ast::*;
 use crate::value::{ClosureData, ErrVal, FnRef, MapKey, Value};
 
+/// Program output: buffered for tests and run_source, streamed for the CLI
+/// so interactive programs (input(), chat loops) work.
+pub enum Out {
+    Buf(String),
+    Stdout,
+}
+
+impl Out {
+    pub fn push_str(&mut self, s: &str) {
+        match self {
+            Out::Buf(b) => b.push_str(s),
+            Out::Stdout => {
+                use std::io::Write;
+                print!("{s}");
+                let _ = std::io::stdout().flush();
+            }
+        }
+    }
+
+    pub fn take(&mut self) -> String {
+        match self {
+            Out::Buf(b) => std::mem::take(b),
+            Out::Stdout => String::new(),
+        }
+    }
+}
+
 pub struct Fault {
     pub msg: String,
     pub stack: Vec<String>,
@@ -62,7 +89,8 @@ pub struct Interp<'p> {
     /// Return types of the active function, for zero-filling check returns.
     ret_stack: Vec<Vec<TypeExpr>>,
     call_stack: Vec<String>,
-    pub out: String,
+    pub out: Out,
+    pub(crate) prog_args: Vec<String>,
 }
 
 impl<'p> Interp<'p> {
@@ -119,7 +147,8 @@ impl<'p> Interp<'p> {
             saved: vec![],
             ret_stack: vec![],
             call_stack: vec![],
-            out: String::new(),
+            out: Out::Buf(String::new()),
+            prog_args: vec![],
         }
     }
 
@@ -311,7 +340,15 @@ impl<'p> Interp<'p> {
     }
 
     pub fn take_out(&mut self) -> String {
-        std::mem::take(&mut self.out)
+        self.out.take()
+    }
+
+    pub fn set_args(&mut self, args: Vec<String>) {
+        self.prog_args = args;
+    }
+
+    pub fn stream_stdout(&mut self) {
+        self.out = Out::Stdout;
     }
 
     // ---------- statements ----------

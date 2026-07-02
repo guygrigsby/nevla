@@ -8,7 +8,7 @@ impl Interp<'_> {
             "print" => {
                 let line = args.iter().map(render).collect::<Vec<_>>().join(" ");
                 self.out.push_str(&line);
-                self.out.push('\n');
+                self.out.push_str("\n");
                 Ok(Value::Unit)
             }
             "printf" | "sprintf" => {
@@ -36,6 +36,31 @@ impl Interp<'_> {
                     _ => return Err(self.fault("range needs int arguments")),
                 };
                 Ok(Value::List((lo..hi.max(lo)).map(Value::Int).collect()))
+            }
+            "args" => Ok(Value::List(
+                self.prog_args.iter().cloned().map(Value::Str).collect(),
+            )),
+            "input" => {
+                let Some(Value::Str(prompt)) = args.first() else {
+                    return Err(self.fault("input needs a str prompt"));
+                };
+                self.out.push_str(prompt);
+                let mut line = String::new();
+                use std::io::BufRead;
+                match std::io::stdin().lock().read_line(&mut line) {
+                    Ok(0) => Ok(Value::Tuple(vec![
+                        Value::Str(String::new()),
+                        Value::Err(ErrVal { msg: "eof".into(), ..Default::default() }),
+                    ])),
+                    Ok(_) => {
+                        let line = line.trim_end_matches(['\n', '\r']).to_string();
+                        Ok(Value::Tuple(vec![Value::Str(line), Value::NoneV]))
+                    }
+                    Err(e) => Ok(Value::Tuple(vec![
+                        Value::Str(String::new()),
+                        Value::Err(ErrVal { msg: format!("stdin: {e}"), ..Default::default() }),
+                    ])),
+                }
             }
             _ => Err(self.fault(format!("unknown function: {name}"))),
         }

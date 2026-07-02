@@ -1578,7 +1578,30 @@ range(a, b) list[int]     // a, a+1, ..., b-1
 Returns a freshly built list. If `b <= a` (or `n <= 0`), the result is the
 empty list; `range` never faults.
 
-### 14.6 Methods on builtin types
+### 14.6 args
+
+```
+args() list[str]
+```
+
+Returns the program's arguments: everything after the source file on the
+runner's command line (`tk prog.mg a b` yields `["a", "b"]`). Takes no
+arguments. In contexts with no command line (tests, embedding) the list is
+empty.
+
+### 14.7 input
+
+```
+input(prompt str) (str, error?)
+```
+
+Writes `prompt` to standard output (no trailing newline, flushed), then reads
+one line from standard input. The returned string excludes the line
+terminator. End of input and read failures are error values, not faults
+(`eof` on end of input). When a program runs through the CLI runner its
+output is streamed unbuffered, so a prompt is visible before input blocks.
+
+### 14.8 Methods on builtin types
 
 All receivers are unchanged; results are new values.
 
@@ -1768,6 +1791,9 @@ error.
 
 Before `main` runs, all `import py` modules are imported; a failing Python
 import terminates the program as a runtime error.
+
+Program arguments follow the file on the runner command line and are exposed
+through the `args()` builtin (section 14.6).
 
 ### 17.2 Termination and exit status
 

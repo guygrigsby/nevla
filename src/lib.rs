@@ -29,6 +29,12 @@ pub struct RunResult {
 }
 
 pub fn run_source(path: &Path) -> RunResult {
+    run_with(path, vec![], false)
+}
+
+/// Run with program arguments; `stream` writes stdout live (interactive CLI)
+/// instead of buffering into RunResult.
+pub fn run_with(path: &Path, args: Vec<String>, stream: bool) -> RunResult {
     // the interpreter's recursion cap (1000 mongoose frames, several Rust
     // frames each) needs more stack than a default thread has in debug
     // builds; run on a dedicated big-stack thread.
@@ -36,7 +42,7 @@ pub fn run_source(path: &Path) -> RunResult {
     std::thread::Builder::new()
         .name("mongoose-interp".into())
         .stack_size(64 * 1024 * 1024)
-        .spawn(move || compile_and(&path, true))
+        .spawn(move || compile_and(&path, true, args, stream))
         .expect("spawn interpreter thread")
         .join()
         .unwrap_or_else(|_| RunResult {
@@ -82,7 +88,7 @@ pub fn resolve_entry(file: Option<std::path::PathBuf>) -> Result<std::path::Path
 
 /// Typecheck only; never provisions an environment or runs code.
 pub fn check_source(path: &Path) -> RunResult {
-    compile_and(path, false)
+    compile_and(path, false, vec![], false)
 }
 
 fn compile_err(msg: impl Into<String>) -> RunResult {
@@ -92,7 +98,7 @@ fn compile_err(msg: impl Into<String>) -> RunResult {
     }
 }
 
-fn compile_and(path: &Path, run: bool) -> RunResult {
+fn compile_and(path: &Path, run: bool, args: Vec<String>, stream: bool) -> RunResult {
     if !path.exists() {
         return compile_err(format!("{}: no such file", path.display()));
     }
@@ -156,8 +162,12 @@ fn compile_and(path: &Path, run: bool) -> RunResult {
         };
     }
     let mut interp = interp::Interp::new(&prog);
+    interp.set_args(args);
+    if stream {
+        interp.stream_stdout();
+    }
     let result = interp.run_main();
-    let stdout = std::mem::take(&mut interp.out);
+    let stdout = interp.take_out();
     match result {
         Ok(None) => RunResult {
             stdout,

@@ -12,7 +12,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Typecheck and run a program (defaults to the project's src/main.mg)
-    Run { file: Option<PathBuf> },
+    Run {
+        file: Option<PathBuf>,
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
     /// Typecheck only (defaults to the project's src/main.mg)
     Check { file: Option<PathBuf> },
     /// Scaffold a new project
@@ -35,7 +39,9 @@ enum PyCmd {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Run { file } => with_entry(file, |f| mongoose::report(mongoose::run_source(f))),
+        Cmd::Run { file, args } => {
+            with_entry(file, |f| mongoose::report(mongoose::run_with(f, args.clone(), true)))
+        }
         Cmd::Check { file } => with_entry(file, |f| mongoose::report(mongoose::check_source(f))),
         Cmd::Py {
             cmd: PyCmd::Add { package },

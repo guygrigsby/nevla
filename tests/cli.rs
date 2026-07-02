@@ -223,3 +223,30 @@ fn repl_evaluates() {
     assert!(stdout.contains("42\n"), "{stdout}");
     assert!(stdout.contains("10\n"), "{stdout}");
 }
+
+#[test]
+fn program_args_and_input() {
+    let d = tempdir("argsin");
+    let f = d.join("echo.mg");
+    std::fs::write(
+        &f,
+        "fn main() {\n    for a in args() {\n        print(a)\n    }\n    for {\n        line, err := input(\"> \")\n        if err != none {\n            break\n        }\n        print(\"got: \" + line)\n    }\n}\n",
+    )
+    .unwrap();
+    let mut child = Command::new(tk())
+        .arg(&f)
+        .args([":8080", "llama"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    child.stdin.as_mut().unwrap().write_all(b"hello\nworld\n").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains(":8080\n"), "{stdout}");
+    assert!(stdout.contains("llama\n"), "{stdout}");
+    assert!(stdout.contains("got: hello\n"), "{stdout}");
+    assert!(stdout.contains("got: world\n"), "{stdout}");
+}
