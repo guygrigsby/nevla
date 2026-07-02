@@ -1818,8 +1818,11 @@ The layout:
 When the compiled file lies inside a project, every `import py "m"` is
 validated at compile time: the top-level segment of `m` (the part before the
 first `.`) must either be declared under `[py-deps]` in `mongoose.toml` or be
-a module of the Python standard library. An undeclared import is a
-compile-time error directing the user to `mongoose py add`.
+a module of the Python standard library. Declared names match import names
+case-insensitively with `-` and `_` interchangeable, mirroring PyPI name
+normalization (`sentence-transformers` satisfies
+`import py "sentence_transformers"`). An undeclared import is a compile-time
+error directing the user to `mongoose py add`.
 
 Outside a project there is no manifest to check; py imports resolve at
 program start against the embedded interpreter, and a missing module is a

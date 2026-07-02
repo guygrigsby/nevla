@@ -125,7 +125,7 @@ fn compile_and(path: &Path, run: bool) -> RunResult {
             }
             for m in &py_imports {
                 let top = m.split('.').next().unwrap_or(m);
-                if !proj.py_deps.contains_key(top) && !bridge::is_stdlib(top) {
+                if !dep_declared(&proj, top) && !bridge::is_stdlib(top) {
                     return compile_err(format!(
                         "import py {m:?}: not declared in mongoose.toml; run: mongoose py add {top}"
                     ));
@@ -170,5 +170,31 @@ fn compile_and(path: &Path, run: bool) -> RunResult {
                 exit: ExitKind::RuntimeError(msg),
             }
         }
+    }
+}
+
+/// PyPI treats `-` and `_` as interchangeable in package names; imports use
+/// the module name. Match declared deps against import names accordingly.
+fn dep_declared(proj: &project::Project, module: &str) -> bool {
+    let norm = |s: &str| s.replace('-', "_").to_lowercase();
+    let m = norm(module);
+    proj.py_deps.keys().any(|k| norm(k) == m)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dashed_dep_satisfies_underscored_import() {
+        let proj = project::Project {
+            root: std::path::PathBuf::new(),
+            name: "x".into(),
+            python: "3.12".into(),
+            py_deps: [("sentence-transformers".to_string(), "*".to_string())].into(),
+        };
+        assert!(dep_declared(&proj, "sentence_transformers"));
+        assert!(dep_declared(&proj, "sentence-transformers"));
+        assert!(!dep_declared(&proj, "torch"));
     }
 }

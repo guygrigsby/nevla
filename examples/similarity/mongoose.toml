@@ -1,0 +1,6 @@
+[project]
+name = "similarity"
+python = "3.12"
+
+[py-deps]
+sentence-transformers = "*"
