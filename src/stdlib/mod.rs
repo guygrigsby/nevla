@@ -1,3 +1,4 @@
+pub mod file;
 pub mod math;
 
 use crate::interp::{Fault, Interp};
@@ -11,6 +12,7 @@ pub fn call(
 ) -> Result<Value, Fault> {
     match module {
         "math" => math::call(interp, name, args),
+        "file" => file::call(interp, name, args),
         _ => Err(interp.fault(format!("{module}.{name} is not implemented yet"))),
     }
 }
