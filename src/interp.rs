@@ -62,19 +62,16 @@ macro_rules! val {
     };
 }
 
-/// val! for callers returning Result<Flow, Fault>.
+/// val! for callers returning Result<Flow, Fault>. Takes the interpreter so
+/// the unhandled-py fault carries the rikki call stack (macro hygiene keeps
+/// `self` out of the expansion).
 macro_rules! sval {
-    ($e:expr) => {
+    ($i:expr, $e:expr) => {
         match $e? {
             Ev::V(v) => v,
             Ev::Ret(r) => return Ok(Flow::Return(r)),
             // the checker forces py chains into check or destructure
-            Ev::PyErr(e) => {
-                return Err(Fault {
-                    msg: format!("unhandled python error: {}", e.msg),
-                    stack: vec![],
-                })
-            }
+            Ev::PyErr(e) => return Err($i.unhandled_py(e)),
         }
     };
 }
@@ -139,6 +136,11 @@ impl<'p> Interp<'p> {
             msg: msg.into(),
             stack: self.call_stack.clone(),
         }
+    }
+
+    /// A python error escaping its chain unconsumed; carries the rikki stack.
+    fn unhandled_py(&self, e: ErrVal) -> Fault {
+        self.fault(format!("unhandled python error: {}", e.msg))
     }
 
     /// Run fn main. Returns main's error value if it returned one.
@@ -220,10 +222,7 @@ impl<'p> Interp<'p> {
             if let StmtKind::Expr(e) = &c.body[0].kind {
                 match self.eval(e) {
                     Ok(Ev::V(v)) | Ok(Ev::Ret(v)) => Ok(Flow::Return(v)),
-                    Ok(Ev::PyErr(e)) => Err(Fault {
-                        msg: format!("unhandled python error: {}", e.msg),
-                        stack: vec![],
-                    }),
+                    Ok(Ev::PyErr(e)) => Err(self.unhandled_py(e)),
                     Err(f) => Err(f),
                 }
             } else {
@@ -399,24 +398,21 @@ impl<'p> Interp<'p> {
                 Ok(Flow::Normal)
             }
             StmtKind::Assign { target, expr } => {
-                let v = sval!(self.eval(expr));
+                let v = sval!(self, self.eval(expr));
                 match self.assign(target, v)? {
                     Ev::Ret(r) => Ok(Flow::Return(r)),
-                    Ev::PyErr(e) => Err(Fault {
-                        msg: format!("unhandled python error: {}", e.msg),
-                        stack: vec![],
-                    }),
+                    Ev::PyErr(e) => Err(self.unhandled_py(e)),
                     Ev::V(_) => Ok(Flow::Normal),
                 }
             }
             StmtKind::Expr(e) => {
-                sval!(self.eval(e));
+                sval!(self, self.eval(e));
                 Ok(Flow::Normal)
             }
             StmtKind::Return(exprs) => {
                 let mut vals = vec![];
                 for e in exprs {
-                    vals.push(sval!(self.eval(e)));
+                    vals.push(sval!(self, self.eval(e)));
                 }
                 let v = match vals.len() {
                     0 => Value::Unit,
@@ -431,11 +427,11 @@ impl<'p> Interp<'p> {
                 elifs,
                 els,
             } => {
-                if truthy(&sval!(self.eval(cond))) {
+                if truthy(&sval!(self, self.eval(cond))) {
                     return self.exec_block(then);
                 }
                 for (c, b) in elifs {
-                    if truthy(&sval!(self.eval(c))) {
+                    if truthy(&sval!(self, self.eval(c))) {
                         return self.exec_block(b);
                     }
                 }
@@ -445,7 +441,7 @@ impl<'p> Interp<'p> {
                 Ok(Flow::Normal)
             }
             StmtKind::ForRange { names, iter, body } => {
-                let it = sval!(self.eval(iter));
+                let it = sval!(self, self.eval(iter));
                 let rounds: Box<dyn Iterator<Item = Vec<Value>>> = match it {
                     Value::Int(n) => Box::new((0..n.max(0)).map(|i| vec![Value::Int(i)])),
                     Value::List(items) => Box::new(
@@ -485,7 +481,7 @@ impl<'p> Interp<'p> {
             StmtKind::ForCond { cond, body } => {
                 loop {
                     if let Some(c) = cond {
-                        if !truthy(&sval!(self.eval(c))) {
+                        if !truthy(&sval!(self, self.eval(c))) {
                             break;
                         }
                     }
