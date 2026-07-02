@@ -262,6 +262,12 @@ impl Parser {
 
     fn type_expr_inner(&mut self) -> Result<TypeExpr, Diag> {
         let base = match self.peek().cloned() {
+            Some(Token::LBracket) => {
+                self.bump();
+                self.expect(&Token::RBracket, "] in slice type")?;
+                let inner = self.type_expr()?;
+                TypeExpr::List(Box::new(inner))
+            }
             Some(Token::Py) => {
                 self.bump();
                 TypeExpr::Named("py".into())
@@ -299,12 +305,6 @@ impl Parser {
             Some(Token::Ident(name)) => {
                 self.bump();
                 match name.as_str() {
-                    "list" => {
-                        self.expect(&Token::LBracket, "[")?;
-                        let inner = self.type_expr()?;
-                        self.expect(&Token::RBracket, "]")?;
-                        TypeExpr::List(Box::new(inner))
-                    }
                     "map" => {
                         self.expect(&Token::LBracket, "[")?;
                         let k = self.type_expr()?;
@@ -718,6 +718,26 @@ impl Parser {
                 Ok(e)
             }
             Some(Token::LBracket) => {
+                // `[]T(x)` is a slice conversion when a type follows `[]`;
+                // otherwise `[` opens a list literal.
+                if self.peek2() == Some(&Token::RBracket) {
+                    let type_follows = matches!(
+                        self.toks.get(self.pos + 2).map(|s| &s.node),
+                        Some(Token::Ident(_)) | Some(Token::Py) | Some(Token::Fn)
+                            | Some(Token::LBracket)
+                    );
+                    if type_follows {
+                        let target = self.type_expr()?;
+                        let mut args = self.call_args()?;
+                        if args.len() != 1 {
+                            return Err(self.err_here("conversion takes one argument"));
+                        }
+                        return Ok(mk(ExprKind::Conv {
+                            target,
+                            arg: Box::new(args.remove(0)),
+                        }));
+                    }
+                }
                 self.bump();
                 self.skip_nl();
                 let mut items = vec![];
@@ -743,21 +763,10 @@ impl Parser {
                 Ok(mk(ExprKind::Lambda { params, ret, body }))
             }
             Some(Token::Ident(name)) => {
-                // conversions: int(x), str(x), float(x), bool(x), list[T](x)
+                // conversions: int(x), str(x), float(x), bool(x); []T(x) is handled at LBracket
                 if CONV_NAMES.contains(&name.as_str()) && self.peek2() == Some(&Token::LParen) {
                     self.bump();
                     let target = TypeExpr::Named(name);
-                    let mut args = self.call_args()?;
-                    if args.len() != 1 {
-                        return Err(self.err_here("conversion takes one argument"));
-                    }
-                    return Ok(mk(ExprKind::Conv {
-                        target,
-                        arg: Box::new(args.remove(0)),
-                    }));
-                }
-                if name == "list" && self.peek2() == Some(&Token::LBracket) {
-                    let target = self.type_expr()?;
                     let mut args = self.call_args()?;
                     if args.len() != 1 {
                         return Err(self.err_here("conversion takes one argument"));
@@ -900,7 +909,7 @@ mod tests {
 
     #[test]
     fn conversions() {
-        let e = expr("list[int](t.shape)");
+        let e = expr("[]int(t.shape)");
         match e.kind {
             E::Conv { target, .. } => {
                 assert_eq!(

@@ -7,12 +7,12 @@ struct Hit {
     score float
 }
 
-fn rank(query str, corpus list[str]) (list[Hit], error?) {
+fn rank(query str, corpus []str) ([]Hit, error?) {
     model := check sentence_transformers.SentenceTransformer("all-MiniLM-L6-v2")
     q := check model.encode([query])
     c := check model.encode(corpus)
     sims := check sentence_transformers.util.cos_sim(q, c)
-    scores := check list[float](sims[0].tolist())
+    scores := check []float(sims[0].tolist())
     hits := range(len(corpus)).map(fn(i) { Hit{text: corpus[i], score: scores[i]} })
     return hits.sorted_by(fn(a, b) { a.score > b.score }), none
 }

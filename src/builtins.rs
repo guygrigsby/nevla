@@ -285,7 +285,7 @@ impl Interp<'_> {
                 for it in &items {
                     match it {
                         Value::Str(s) => parts.push(s.clone()),
-                        _ => return Err(self.fault("join needs list[str]")),
+                        _ => return Err(self.fault("join needs []str")),
                     }
                 }
                 Ok(Value::Str(parts.join(&sep)))

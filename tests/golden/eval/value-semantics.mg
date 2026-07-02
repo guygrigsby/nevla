@@ -1,4 +1,4 @@
-fn mutate(xs list[int]) {
+fn mutate(xs []int) {
     xs[0] = 42
 }
 fn main() {

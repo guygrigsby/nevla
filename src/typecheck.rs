@@ -1414,7 +1414,7 @@ impl Checker {
                     self.diag(
                         line,
                         col,
-                        format!("sum needs list[int] or list[float], got {recv}"),
+                        format!("sum needs []int or []float, got {recv}"),
                     );
                 }
                 one((**elem).clone())
@@ -1445,7 +1445,7 @@ impl Checker {
             }
             (List(elem), "join") => {
                 if !matches!(**elem, Str | Unknown) {
-                    self.diag(line, col, format!("join needs list[str], got {recv}"));
+                    self.diag(line, col, format!("join needs []str, got {recv}"));
                 }
                 self.check_args(&[Str], args, line, col);
                 one(Str)

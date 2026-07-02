@@ -37,7 +37,7 @@ fn main() (error?) {
 
 ### Types
 
-`int`, `float`, `bool`, `str`, `list[T]`, `map[K, V]`, structs, `fn(...) ...` function types, `T?` options, `error` and `py`. That's the whole v1 zoo.
+`int`, `float`, `bool`, `str`, `[]T`, `map[K, V]`, structs, `fn(...) ...` function types, `T?` options, `error` and `py`. That's the whole v1 zoo.
 
 - No implicit conversions, not even `int` to `float`.
 - No truthiness. Conditions are `bool` or they don't compile.
@@ -86,7 +86,7 @@ import py "torch"
 fn main() (error?) {
     t := check torch.randn([2, 3])         // t: py
     y := check torch.relu(t)               // py stays py
-    shape := check list[int](t.shape)      // crossing back is explicit
+    shape := check []int(t.shape)      // crossing back is explicit
     print(shape)
     return none
 }
@@ -95,7 +95,7 @@ fn main() (error?) {
 - `import py "modname"` binds a Python module as a value of type `py`, the one dynamic type in the language. Attribute access, calls, indexing and operators on `py` dispatch to an embedded CPython.
 - Every `py` expression is fallible as a unit. A chain like `model.forward(x)` evaluates to `(py, error?)`; the first Python exception becomes a mongoose `error` carrying exception type, message and traceback. Python's exception chaos converts to error discipline at the border, mechanically.
 - Inbound conversion is automatic: `int`, `float`, `bool`, `str`, `list`, `map` convert to Python equivalents when passed to a `py` call.
-- Outbound is explicit and fallible: results come back as `py`, and extraction is an assertion, `int(x)`, `str(x)`, `list[float](x)`, each returning `(T, error?)`.
+- Outbound is explicit and fallible: results come back as `py`, and extraction is an assertion, `int(x)`, `str(x)`, `[]float(x)`, each returning `(T, error?)`.
 - Caveat, stated plainly: `py` values are references to live Python objects. Value semantics stop at the bridge. A `py` tensor assigned to two variables is one tensor. The type tells you which rules a value plays by; weirdness is allowed but never disguised.
 
 The checker can't see inside `py` values, but it guarantees the dynamic stuff never leaks into a `str` or a `User` without passing an explicit fallible conversion.
@@ -143,14 +143,14 @@ Small, not tiny. Python fills every other gap through the bridge.
 - `print(...)`, variadic, renders any value.
 - `printf(format, ...)` and `sprintf(format, ...) str` with Go verbs: `%v` `%d` `%s` `%f` `%t` `%q` `%%`, width and precision (`%.2f`). No `fmt` module.
 - `len(x)` for `str`, `list`, `map`.
-- The fallible conversions already specced: `int()`, `str()`, `float()`, `list[T]()`.
+- The fallible conversions already specced: `int()`, `str()`, `float()`, `[]T()`.
 
 ### Modules
 
 Stdlib modules import by bare name (`import "http"`); project files import by path. `import py` stays its own form.
 
 - **http.** Client only. `http.get(ctx, url)` and `http.post(ctx, url, body)` return `(Response, error?)`; `http.request(ctx, Request)` for full control of method and headers. `Response` is a plain struct: `status int`, `body str`, `headers map[str, str]`. Follows redirects, honors ctx deadline.
-- **file.** `read(path) (str, error?)`, `write(path, s) error?`, `append(path, s) error?`, `exists(path) bool`, `list(dir) (list[str], error?)`, `remove(path) error?`, `mkdir(path) error?`. Paths are `str`.
+- **file.** `read(path) (str, error?)`, `write(path, s) error?`, `append(path, s) error?`, `exists(path) bool`, `list(dir) ([]str, error?)`, `remove(path) error?`, `mkdir(path) error?`. Paths are `str`.
 - **math.** `abs`, `min`, `max`, `sqrt`, `pow`, `floor`, `ceil`, `round`, constants `pi` and `e`.
 - **ctx.** Sequential v1, so a ctx is a deadline plus an interrupt flag, no cross-task cancellation yet. `ctx.background()`, `ctx.timeout(parent, secs)`, `ctx.interrupt(parent)` which cancels on SIGINT so Ctrl-C surfaces as a normal error through `check` chains instead of killing the process. I/O ops take ctx as first arg (http in v1, file later). Methods: `done() bool`, `err() error?`.
 - **error.** `error.new(msg)`, `error.wrap(err, msg)`. Available without an import (constructing errors is core to the language; `import "error"` stays legal and does nothing extra). Error values expose `.msg str` and `.cause error?`; bridge errors add `.pytype` and `.traceback`. Chain-walking helpers wait for real usage.
@@ -164,15 +164,15 @@ No `bytes` type in the v1 zoo, so `file` and `http` bodies are utf-8 `str` and b
 The mundane stuff, pinned so the implementation plan has exact answers.
 
 - Comments: `//`.
-- Control flow: `if` / `else if` / `else`, conditions strictly `bool`. One loop keyword: `for x in xs`, `for k, v in m`, `for cond { }`, bare `for { }` infinite. `break` and `continue`. `range(n)` and `range(a, b)` are builtins returning `list[int]`.
+- Control flow: `if` / `else if` / `else`, conditions strictly `bool`. One loop keyword: `for x in xs`, `for k, v in m`, `for cond { }`, bare `for { }` infinite. `break` and `continue`. `range(n)` and `range(a, b)` are builtins returning `[]int`.
 - Operators: `+ - * / %` on `int`; `+ - * /` on `float`; `+` concatenates `str` and `list`; `== !=` on comparable values; `< <= > >=` on `int`, `float`, `str`; `&& || !` on `bool`. No mixed `int`/`float` arithmetic.
 - Structs: `struct User { name str, age int }`, literal `User{name: "guy", age: 44}`, dot access. No methods on user structs in v1.
 - Indexing: `xs[i]` (fault if out of bounds), `xs[i] = v`, slices `xs[a:b]`. Map read `m[k]` returns `V?` (missing key is `none`, flow typing applies); `m[k] = v` inserts or updates. Map iteration and `keys()` follow insertion order.
-- String methods: `split`, `trim`, `contains`, `replace`, `upper`, `lower`, `starts_with`, `ends_with`. List methods: `map`, `filter`, `each`, `sum`, `sorted`, `sorted_by`, `append`, `contains`, `join` (on `list[str]`). Map methods: `keys`, `values`, `has`, `delete`.
+- String methods: `split`, `trim`, `contains`, `replace`, `upper`, `lower`, `starts_with`, `ends_with`. List methods: `map`, `filter`, `each`, `sum`, `sorted`, `sorted_by`, `append`, `contains`, `join` (on `[]str`). Map methods: `keys`, `values`, `has`, `delete`.
 - Runtime faults (division by zero, integer overflow, index out of bounds, recursion past 1000 frames): not catchable in v1. The interpreter stops the program and reports the fault with a mongoose stack trace, exiting nonzero. Still never a process crash or a Rust panic. The parser likewise bounds expression nesting (256 levels) rather than crash on hostile input.
 - Recursive structs must break the cycle with an option (`next Node?`), list, or map; a by-value cycle is a compile error (such a value could never be constructed).
 - A bare `[]` with no surrounding type context is a compile error; in a typed position (argument, return, field, assignment to a declared list) it infers fine.
-- Concatenating `list[T] + list[T?]` widens to `list[T?]`, never the reverse.
+- Concatenating `[]T + []T?` widens to `[]T?`, never the reverse.
 - `contains` compares structurally (lists, structs, maps, recursively). The `==` operator stays scalar-only in v1.
 - `printf`/`sprintf` with a literal format string are verb-checked at compile time (`%d` on a str is a compile error); dynamic formats check at runtime.
 - The zero value of `py` (what a failed `check` destructure leaves behind) is Python's `None`, so touching it yields a normal Python error value, not a fault.

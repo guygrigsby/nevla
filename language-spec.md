@@ -265,7 +265,7 @@ The complete set of v1 types is:
 
 ```
 int   float   bool   str
-list[T]   map[K, V]   T?
+[]T   map[K, V]   T?
 fn(...) ...   struct types   error   py
 ```
 
@@ -290,7 +290,7 @@ between `int` and `float` (section 7.9.1).
 
 ### 5.2 List types
 
-`list[T]` is an ordered sequence of values of element type `T`. Lists have
+`[]T` is an ordered sequence of values of element type `T`. Lists have
 value semantics (chapter 11): assignment copies the whole list.
 
 ### 5.3 Map types
@@ -394,9 +394,9 @@ fault.
 
 ```
 Type      = BaseType [ "?" ] .
-BaseType  = TypeName | ListType | MapType | FnType | "py" .
+BaseType  = TypeName | SliceType | MapType | FnType | "py" .
 TypeName  = identifier [ "." identifier ] .
-ListType  = "list" "[" Type "]" .
+SliceType = "[" "]" Type .
 MapType   = "map" "[" Type "," Type "]" .
 FnType    = "fn" "(" [ TypeList ] ")" [ FnResult ] .
 FnResult  = "(" [ TypeList ] ")" | Type .
@@ -417,7 +417,7 @@ element, return slot) of type `T` when:
 - `T` and `V` are identical; or
 - `T` is `T0?` and `V` is assignable to `T0`, or `V` is `V0?` and `V0` is
   assignable to `T0` (widening into options, applied recursively); or
-- `T` is `list[A]`, `V` is `list[B]`, and `B` is assignable to `A`; or
+- `T` is `[]A`, `V` is `[]B`, and `B` is assignable to `A`; or
 - `T` is `map[AK, AV]`, `V` is `map[BK, BV]`, and `BK`, `BV` are assignable
   to `AK`, `AV` respectively; or
 - either side's type could not be determined because of a prior compile
@@ -439,7 +439,7 @@ of failed conversions and stdlib calls:
 | `float` | `0.0` |
 | `bool` | `false` |
 | `str` | `""` |
-| `list[T]` | `[]` |
+| `[]T` | `[]` |
 | `map[K, V]` | empty map |
 | `T?` | `none` |
 | struct | struct with every field set to its zero value, recursively |
@@ -593,7 +593,7 @@ ListLit = "[" { newline } [ ExpressionList [ "," ] ] { newline } "]" .
 ExpressionList = Expression { "," { newline } Expression } .
 ```
 
-A nonempty list literal has type `list[E]` where `E` is the element type
+A nonempty list literal has type `[]E` where `E` is the element type
 supplied by context, or, absent context, the type of the first element; each
 subsequent element must be assignable to `E`.
 
@@ -603,9 +603,9 @@ a location of known list type. A bare `[]` with no such context is a
 compile-time error ("cannot infer element type of []").
 
 ```
-fn total(xs list[int]) int { return len(xs) }
+fn total(xs []int) int { return len(xs) }
 
-print(total([]))     // ok: parameter supplies list[int]
+print(total([]))     // ok: parameter supplies []int
 // xs := []          // compile error
 ```
 
@@ -741,7 +741,7 @@ Index = "[" { newline } Expression { newline } "]" .
 
 For `a[i]`:
 
-- If `a` has type `list[T]`, `i` must be `int` and the result is `T`.
+- If `a` has type `[]T`, `i` must be `int` and the result is `T`.
   Indices run from 0. An index outside `0 <= i < len(a)` is a runtime fault.
   Negative indices are not supported.
 - If `a` has type `str`, `i` must be `int` and the result is a `str` holding
@@ -768,7 +768,7 @@ if v != none {
 Slice = "[" { newline } Expression ":" Expression "]" .
 ```
 
-`a[lo:hi]` slices a `list[T]` (yielding `list[T]`) or a `str` (yielding
+`a[lo:hi]` slices a `[]T` (yielding `[]T`) or a `str` (yielding
 `str`, positions in code points). Both bounds are required and must be `int`.
 The bounds must satisfy `0 <= lo <= hi <= len(a)`; anything else is a runtime
 fault. The result is a copy of the half-open range `[lo, hi)`; `a[n:n]` is
@@ -778,7 +778,7 @@ empty. Slicing any other type, including `py`, is a compile-time error.
 
 ```
 Conversion = ( "int" | "float" | "str" | "bool" ) "(" Expression ")"
-           | "list" "[" Type "]" "(" Expression ")" .
+           | "[" "]" Type "(" Expression ")" .
 ```
 
 Conversions are the explicit, fallible casts of the language. Every
@@ -804,13 +804,13 @@ Permitted operand types and behavior, for non-`py` operands:
 | `bool(x)` | `bool` | identity |
 | | `str` | after trimming, exactly `"true"` or `"false"`; anything else is an error value |
 | `str(x)` | any type | the canonical rendering of section 14.1; never fails |
-| `list[T](x)` | `list[U]` | yields the operand list unchanged; element types are not validated in v1 (see below) |
+| `[]T(x)` | `[]U` | yields the operand list unchanged; element types are not validated in v1 (see below) |
 
 Any other operand type is a compile-time error ("cannot convert").
 
-`list[T]` applied to a mongoose list performs no per-element checking in v1:
+`[]T` applied to a mongoose list performs no per-element checking in v1:
 the list value passes through, and the expression's static type becomes
-`list[T]`. If the actual elements do not match `T`, later operations on them
+`[]T`. If the actual elements do not match `T`, later operations on them
 fault at runtime. Programs must not rely on this as a checked cast; its
 intended use is extraction from `py` values, where elements are genuinely
 converted (section 13.5).
@@ -892,7 +892,7 @@ binary_op  = "||" | "&&" | "==" | "!=" | "<" | "<=" | ">" | ">="
 | `+` `-` `*` `/` `%` | `int`, `int` | `int` |
 | `+` `-` `*` `/` | `float`, `float` | `float` |
 | `+` | `str`, `str` | `str` (concatenation) |
-| `+` | `list[A]`, `list[B]` | list concatenation, see below |
+| `+` | `[]A`, `[]B` | list concatenation, see below |
 
 `int` and `float` never mix: `1 + 2.5` is a compile-time error
 ("int and float do not mix"). `%` is defined on `int` only. Integer `/` and
@@ -905,9 +905,9 @@ the result takes the wider element type, so concatenation widens toward
 options and never narrows:
 
 ```
-xs := [1]              // list[int]
-ys := [maybe()]        // list[int?]
-zs := xs + ys          // list[int?]
+xs := [1]              // []int
+ys := [maybe()]        // []int?
+zs := xs + ys          // []int?
 ```
 
 If neither element type accepts the other, concatenation is a compile-time
@@ -1149,7 +1149,7 @@ Mongoose has one loop keyword with three forms:
 - `for { ... }` loops forever; only `break` or `return` leaves it.
 - `for cond { ... }` evaluates `cond` (a `bool`) before each iteration and
   stops when it is false.
-- `for x in xs { ... }` iterates a `list[T]`, binding `x: T` for each
+- `for x in xs { ... }` iterates a `[]T`, binding `x: T` for each
   element in order. `for k, v in m { ... }` iterates a `map[K, V]` in
   insertion order, binding `k: K`, `v: V`. The name count must match the
   iterated type: one name for a list, two for a map; anything else, or
@@ -1349,7 +1349,7 @@ b := a
 b[0] = 99
 print(a[0])   // 1
 
-fn mutate(xs list[int]) { xs[0] = 42 }
+fn mutate(xs []int) { xs[0] = 42 }
 mutate(a)
 print(a[0])   // 1
 ```
@@ -1397,7 +1397,7 @@ The complete set of fault conditions reachable from checked programs:
 - reading a module function member as a value instead of calling it
   (section 7.4);
 - operations on list elements whose actual type does not match the list's
-  static element type after an unchecked `list[T]` conversion
+  static element type after an unchecked `[]T` conversion
   (section 7.7).
 
 Float arithmetic never faults (section 5.1). Reading a map never faults.
@@ -1463,7 +1463,7 @@ list elements and map entries:
 | `bool` | `bool` |
 | `str` | `str` |
 | `none` | `None` |
-| `list[T]` | `list` |
+| `[]T` | `list` |
 | `map[K, V]` | `dict` |
 | `py` | the referenced object itself |
 
@@ -1482,7 +1482,7 @@ via the conversions of section 7.7 applied to a `py` operand. Each yields
 | `float(x)` | the object supports extraction as a Python float | Python ints convert |
 | `bool(x)` | (practically) always | Python truthiness of the object |
 | `str(x)` | (practically) always | Python `str()` of the object |
-| `list[T](x)` | the object is iterable and every element extracts as `T` | `T` may be `int`, `float`, `bool`, `str`, or `py`; `py` keeps elements as handles |
+| `[]T(x)` | the object is iterable and every element extracts as `T` | `T` may be `int`, `float`, `bool`, `str`, or `py`; `py` keeps elements as handles |
 
 Failure produces `(zero value of T, error)` with the Python exception
 converted per section 13.4.
@@ -1571,8 +1571,8 @@ for `map`, the entry count. Any other argument type is a compile-time error.
 ### 14.5 range
 
 ```
-range(n) list[int]        // 0, 1, ..., n-1
-range(a, b) list[int]     // a, a+1, ..., b-1
+range(n) []int        // 0, 1, ..., n-1
+range(a, b) []int     // a, a+1, ..., b-1
 ```
 
 Returns a freshly built list. If `b <= a` (or `n <= 0`), the result is the
@@ -1581,7 +1581,7 @@ empty list; `range` never faults.
 ### 14.6 args
 
 ```
-args() list[str]
+args() []str
 ```
 
 Returns the program's arguments: everything after the source file on the
@@ -1609,7 +1609,7 @@ String methods (receiver `str`):
 
 | Method | Signature | Behavior |
 |--------|-----------|----------|
-| `split` | `(sep str) list[str]` | split on separator |
+| `split` | `(sep str) []str` | split on separator |
 | `trim` | `() str` | strip leading and trailing white space |
 | `upper` | `() str` | uppercase |
 | `lower` | `() str` | lowercase |
@@ -1618,17 +1618,17 @@ String methods (receiver `str`):
 | `ends_with` | `(suffix str) bool` | suffix test |
 | `replace` | `(from str, to str) str` | replace all occurrences |
 
-List methods (receiver `list[T]`):
+List methods (receiver `[]T`):
 
 | Method | Signature | Behavior |
 |--------|-----------|----------|
-| `map` | `(f fn(T) U) list[U]` | apply `f` to each element |
-| `filter` | `(f fn(T) bool) list[T]` | keep elements where `f` is true |
+| `map` | `(f fn(T) U) []U` | apply `f` to each element |
+| `filter` | `(f fn(T) bool) []T` | keep elements where `f` is true |
 | `each` | `(f fn(T))` | call `f` on each element; no result |
-| `sum` | `() T` | `T` must be `int` or `float`; sum of elements. Summing an empty `list[int]` yields 0; the result of summing an empty `list[float]` is unspecified in v1 (the reference implementation yields a value that faults on later float use) |
-| `sorted` | `() list[T]` | `T` must be `int`, `float`, or `str`; ascending copy |
-| `sorted_by` | `(before fn(T, T) bool) list[T]` | sorted copy per comparator; stable |
-| `append` | `(v T) list[T]` | copy with `v` appended |
+| `sum` | `() T` | `T` must be `int` or `float`; sum of elements. Summing an empty `[]int` yields 0; the result of summing an empty `[]float` is unspecified in v1 (the reference implementation yields a value that faults on later float use) |
+| `sorted` | `() []T` | `T` must be `int`, `float`, or `str`; ascending copy |
+| `sorted_by` | `(before fn(T, T) bool) []T` | sorted copy per comparator; stable |
+| `append` | `(v T) []T` | copy with `v` appended |
 | `contains` | `(v T) bool` | structural membership (section 11.2) |
 | `join` | `(sep str) str` | `T` must be `str`; concatenation with separator |
 
@@ -1636,8 +1636,8 @@ Map methods (receiver `map[K, V]`):
 
 | Method | Signature | Behavior |
 |--------|-----------|----------|
-| `keys` | `() list[K]` | keys in insertion order |
-| `values` | `() list[V]` | values in insertion order |
+| `keys` | `() []K` | keys in insertion order |
+| `values` | `() []V` | values in insertion order |
 | `has` | `(k K) bool` | key presence |
 | `delete` | `(k K) map[K, V]` | copy without `k`; remaining order preserved |
 
@@ -1686,7 +1686,7 @@ Paths are `str`. Contents are UTF-8 `str`; there is no bytes type in v1.
 | `file.write` | `(path str, s str) error?` | create or truncate, then write |
 | `file.append` | `(path str, s str) error?` | create if missing, append |
 | `file.exists` | `(path str) bool` | existence test; never errors |
-| `file.list` | `(dir str) (list[str], error?)` | entry names, sorted lexicographically |
+| `file.list` | `(dir str) ([]str, error?)` | entry names, sorted lexicographically |
 | `file.remove` | `(path str) error?` | remove a file or an empty directory |
 | `file.mkdir` | `(path str) error?` | create the directory and any missing parents |
 

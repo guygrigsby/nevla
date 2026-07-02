@@ -1,4 +1,4 @@
-fn total(xs list[int]) int {
+fn total(xs []int) int {
     return len(xs)
 }
 fn main() {
