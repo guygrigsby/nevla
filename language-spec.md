@@ -185,14 +185,15 @@ return    struct    true
 `py` is a keyword; it also serves as the name of the `py` type (section 5.8)
 and as the marker in `import py` declarations (section 6.4).
 
-The names `int`, `float`, `bool`, `str`, `error`, `list`, and `map` are not
+The names `int`, `float`, `bool`, `str`, `error`, and `map` are not
 keywords. They are predeclared type names, resolved contextually; `int`,
 `float`, `str`, and `bool` followed immediately by `(` in expression position
-always denote a conversion (section 7.7), and `list [` and `map [` in
-expression position always begin a conversion or map literal respectively.
-Builtin function names (`print`, `printf`, `sprintf`, `len`, `range`) are also
-not reserved; a variable or function declaration with the same name shadows
-the builtin.
+always denote a conversion (section 7.7), and `map [` in expression position
+always begins a map literal. Slice types and slice conversions are written
+with the `[]` prefix (`[]int`, `[]float(x)`; sections 5.9, 7.7) and involve
+no reserved name. Builtin function names (`print`, `printf`, `sprintf`,
+`len`, `range`, `args`, `input`) are also not reserved; a variable or
+function declaration with the same name shadows the builtin.
 
 ### 4.5 Operators and punctuation
 
@@ -726,8 +727,8 @@ parameter count and each argument must be assignable to the corresponding
 parameter type. A call of a non-function is a compile-time error
 ("not callable").
 
-`x.m(a1, ..., an)` is a method call. Methods exist only on the builtin types
-`str`, `list`, `map` (section 14.6), on `Ctx` (section 15.4), on modules
+`x.m(a1, ..., an)` is a method call. Methods exist only on strings, slices,
+and maps (section 14.8), on `Ctx` (section 15.4), on modules
 (where `mod.f(...)` calls the module function), on `error` as the receiver of
 the builtin constructors `error.new` and `error.wrap` (section 15.1), and on
 `py` values (chapter 13). User struct types have no methods in v1.
@@ -786,7 +787,7 @@ empty. Slicing any other type, including `py`, is a compile-time error.
 
 ```
 Conversion = ( "int" | "float" | "str" | "bool" ) "(" Expression ")"
-           | "[" "]" Type "(" Expression ")" .
+           | SliceType "(" Expression ")" .
 ```
 
 Conversions are the explicit, fallible casts of the language. Every
@@ -1106,6 +1107,10 @@ expressions are evaluated outermost first (section 7.12).
 
 ### 8.4 Expression statements
 
+```
+ExpressionStmt = Expression .
+```
+
 An expression may stand alone as a statement. Its value, if any, is
 discarded, subject to the mandatory error handling rule: an expression
 statement whose type is `error?`, ends in `error?`, or is a py chain is a
@@ -1135,8 +1140,13 @@ A bare `return` in a function with declared results is a compile-time error.
 ### 8.6 If statements
 
 ```
-IfStmt = "if" Condition Block { "else" "if" Condition Block } [ "else" Block ] .
+IfStmt    = "if" Condition Block { "else" "if" Condition Block } [ "else" Block ] .
+Condition = Expression .
 ```
+
+A `Condition` is an ordinary expression, parsed with struct literals
+suppressed (section 7.2.3); the same production supplies the header
+expressions of `for` statements (section 8.7).
 
 Each condition must have type `bool`; any other type, including `py`, is a
 compile-time error ("condition must be bool"). `else` and `else if` must
@@ -1168,6 +1178,11 @@ Mongoose has one loop keyword with three forms:
 Struct literals are suppressed in the loop header (section 7.2.3).
 
 ### 8.8 Break and continue
+
+```
+BreakStmt    = "break" .
+ContinueStmt = "continue" .
+```
 
 `break` terminates the innermost enclosing loop; `continue` begins its next
 iteration. Either outside any loop is a compile-time error. Both diverge for
@@ -1369,7 +1384,7 @@ Builtin methods are value-semantic too: `xs.append(v)`, `m.delete(k)`, and
 
 The `==` operator is scalar-only (section 7.9.3). Structural equality is
 provided by `list.contains`, which compares its argument against each element
-recursively: lists and tuples element-wise, structs by name and field values,
+recursively: lists element-wise, structs by name and field values,
 maps by key set and per-key values, scalars and `none` by value. `py`, `fn`,
 `Ctx`, and module values never compare equal to anything under structural
 equality.
@@ -1402,8 +1417,6 @@ The complete set of fault conditions reachable from checked programs:
 - `printf`/`sprintf` with a non-literal format string whose verbs do not
   match the arguments at runtime (wrong count, wrong type, unknown verb, or
   a format ending inside a verb; section 14.3);
-- reading a module function member as a value instead of calling it
-  (section 7.4);
 - operations on list elements whose actual type does not match the list's
   static element type after an unchecked `[]T` conversion
   (section 7.7).
@@ -1593,9 +1606,9 @@ args() []str
 ```
 
 Returns the program's arguments: everything after the source file on the
-runner's command line (`tk prog.mg a b` yields `["a", "b"]`). Takes no
-arguments. In contexts with no command line (tests, embedding) the list is
-empty.
+command line (`tk prog.mg a b` and `mongoose run prog.mg a b` both yield
+`["a", "b"]`). Takes no arguments. In contexts with no command line (tests,
+embedding) the list is empty.
 
 ### 14.7 input
 
@@ -1769,18 +1782,24 @@ equal to the file's stem (the file name without `.mg`):
 // util.mg
 struct Pair { a int, b int }
 fn double(x int) int { return x * 2 }
+fn make(a int, b int) Pair { return Pair{a: a, b: b} }
 
 // main.mg
 import "util.mg"
 
+fn sum(p util.Pair) int { return p.a + p.b }
+
 fn main() {
     print(util.double(21))       // 42
-    p := util.Pair{a: 1, b: 2}   // dotted struct literal is written util.Pair{...}
+    p := util.make(1, 2)
+    print(sum(p))                // 3
 }
 ```
 
 Struct types of a file module are named in type positions with the dotted
-form `util.Pair` (section 5.9).
+form `util.Pair` (section 5.9). A struct literal names a single identifier
+(section 7.2.3); there is no dotted literal form `util.Pair{...}`, so values
+of a module's struct types are constructed by functions of that module.
 
 ### 16.2 Semantics
 
