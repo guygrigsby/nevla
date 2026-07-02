@@ -53,7 +53,7 @@ pub fn init(venv: Option<&Path>) {
         }
         Python::initialize();
         // Inside an embedded interpreter sys.executable is the host binary
-        // (tavi); libraries that re-exec `sys.executable -c ...`
+        // (tk); libraries that re-exec `sys.executable -c ...`
         // (multiprocessing, joblib, tokenizers) would invoke the runner.
         // Point it at the venv's real python instead.
         if let Some(v) = venv {

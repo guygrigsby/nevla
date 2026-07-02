@@ -1,8 +1,8 @@
 # mongoose
 
 Interpreted language: Go's discipline, CPython's ecosystem. Two binaries split
-like uv/python: `mongoose` (setup: new, py add, check, project run) and `tavi`
-(runner: `tavi file.mg`, bare `tavi` is the repl).
+like uv/python: `mongoose` (setup: new, py add, check, project run) and `tk`
+(runner: `tk file.mg`, bare `tk` is the repl).
 
 ## Documents, and what governs what
 
