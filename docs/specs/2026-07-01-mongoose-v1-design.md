@@ -100,15 +100,19 @@ The checker can't see inside `py` values, but it guarantees the dynamic stuff ne
 
 ## Toolchain
 
-One binary. No pip, no venv, no PATH archaeology. Drives `uv` under the hood for all Python provisioning rather than reimplementing any of it.
+Two binaries, split like uv and python. `mongoose` is the setup and project tool; `mg` is the runner. No pip, no venv, no PATH archaeology. `mongoose` drives `uv` under the hood for all Python provisioning rather than reimplementing any of it.
 
 ```
 mongoose new hello        # scaffold: mongoose.toml + src/main.mg
-mongoose run              # typecheck + run
-mongoose check            # typecheck only
 mongoose py add torch     # declare a Python dep
-mongoose repl
+mongoose check            # typecheck only
+mongoose run              # typecheck + run the project entrypoint
+
+mg script.mg              # run a file, python-style
+mg                        # repl
 ```
+
+Scripts are executable: a leading `#!/usr/bin/env mg` line is skipped by the lexer, so `chmod +x` works. Bare `mongoose run` and `mongoose check` resolve the nearest project's `src/main.mg`.
 
 - `mongoose.toml` declares name, Python version pin and Python deps. `mongoose.lock` pins exact resolved versions. Both committed; together they fully determine the environment.
 - The venv lives in a gitignored `.mongoose/`, created and repaired automatically on `run`. Delete it anytime; it regenerates.
