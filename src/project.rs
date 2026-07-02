@@ -15,13 +15,20 @@ pub struct Project {
 
 impl Project {
     /// Walk up from `start` to the nearest directory holding rikki.toml.
+    /// A relative start is resolved against the working directory first, so
+    /// the returned root is always absolute (a root of "" breaks every later
+    /// Command::current_dir on it).
     pub fn find(start: &Path) -> Option<PathBuf> {
+        let start = if start.is_absolute() {
+            start.to_path_buf()
+        } else {
+            std::env::current_dir().ok()?.join(start)
+        };
         let mut dir = if start.is_dir() {
             start
         } else {
-            start.parent()?
-        }
-        .to_path_buf();
+            start.parent()?.to_path_buf()
+        };
         loop {
             if dir.join("rikki.toml").exists() {
                 return Some(dir);
@@ -266,6 +273,20 @@ mod tests {
         std::fs::create_dir_all(&deep).unwrap();
         assert_eq!(Project::find(&deep).unwrap(), d);
         assert_eq!(Project::find(&d.join("src/nested/main.rk")).unwrap(), d);
+    }
+
+    /// A relative start (`tk src/main.rk`) must yield an absolute root, not
+    /// the empty path: Command::current_dir("") is ENOENT, which surfaced as
+    /// a bogus "is uv installed?" on any fresh checkout.
+    #[test]
+    fn find_from_relative_path_returns_absolute_root() {
+        let d = tempdir("find-rel");
+        std::fs::write(d.join("rikki.toml"), "[project]\nname = \"x\"\n").unwrap();
+        std::fs::create_dir_all(d.join("src")).unwrap();
+        std::env::set_current_dir(&d).unwrap();
+        let root = Project::find(Path::new("src/main.rk")).unwrap();
+        assert!(root.is_absolute(), "got {root:?}");
+        assert!(root.join("rikki.toml").exists());
     }
 
     #[test]
