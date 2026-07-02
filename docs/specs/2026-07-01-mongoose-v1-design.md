@@ -130,7 +130,28 @@ Golden files are the spec. A `tests/` tree of `.mg` programs, each paired with e
 
 ## Stdlib
 
-Deliberately tiny: `print`, `len`, string and list/map methods, file read/write, and an `http` module with `get`/`post`. Everything else is what the bridge is for; Python already has the batteries. Exact surface settled during implementation planning.
+Small, not tiny. Python fills every other gap through the bridge.
+
+### Builtins, no import
+
+- `print(...)`, variadic, renders any value.
+- `printf(format, ...)` and `sprintf(format, ...) str` with Go verbs: `%v` `%d` `%s` `%f` `%t` `%q` `%%`, width and precision (`%.2f`). No `fmt` module.
+- `len(x)` for `str`, `list`, `map`.
+- The fallible conversions already specced: `int()`, `str()`, `float()`, `list[T]()`.
+
+### Modules
+
+Stdlib modules import by bare name (`import "http"`); project files import by path. `import py` stays its own form.
+
+- **http.** Client only. `http.get(ctx, url)` and `http.post(ctx, url, body)` return `(Response, error?)`; `http.request(ctx, Request)` for full control of method and headers. `Response` is a plain struct: `status int`, `body str`, `headers map[str, str]`. Follows redirects, honors ctx deadline.
+- **file.** `read(path) (str, error?)`, `write(path, s) error?`, `append(path, s) error?`, `exists(path) bool`, `list(dir) (list[str], error?)`, `remove(path) error?`, `mkdir(path) error?`. Paths are `str`.
+- **math.** `abs`, `min`, `max`, `sqrt`, `pow`, `floor`, `ceil`, `round`, constants `pi` and `e`.
+- **ctx.** Sequential v1, so a ctx is a deadline plus an interrupt flag, no cross-task cancellation yet. `ctx.background()`, `ctx.timeout(parent, secs)`, `ctx.interrupt(parent)` which cancels on SIGINT so Ctrl-C surfaces as a normal error through `check` chains instead of killing the process. I/O ops take ctx as first arg (http in v1, file later). Methods: `done() bool`, `err() error?`.
+- **error.** `error.new(msg)`, `error.wrap(err, msg)`. Error values expose `.msg str` and `.cause error?`; bridge errors add `.pytype` and `.traceback`. Chain-walking helpers wait for real usage.
+
+### Known hole
+
+No `bytes` type in the v1 zoo, so `file` and `http` bodies are utf-8 `str` and binary I/O is out until v1.1. Adding bytes touches literals, indexing and conversions; nothing in the day-one workload needs it (tensors live on the Python side as `py` values).
 
 ## Deliberately out of v1
 
