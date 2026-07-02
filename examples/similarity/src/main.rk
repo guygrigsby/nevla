@@ -1,5 +1,5 @@
 // Semantic search: embed a corpus, rank it against a query.
-// First real mongoose program.
+// First real rikki program.
 import py "sentence_transformers"
 
 struct Hit {

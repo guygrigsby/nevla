@@ -1,6 +1,6 @@
 // Chat with a local model over an OpenAI-compatible API.
-//   tk chat.mg :8080            -> http://localhost:8080
-//   tk chat.mg 10.0.0.5:11434 llama3.2
+//   tk chat.rk :8080            -> http://localhost:8080
+//   tk chat.rk 10.0.0.5:11434 llama3.2
 // Errors are handled, not just propagated: a failed request reports its
 // cause chain and the session continues; three consecutive failures quit.
 import "http"
@@ -64,7 +64,7 @@ fn ask(c Ctx, base str, model str, history str) (str, error?) {
 fn main() (error?) {
     a := args()
     if len(a) == 0 {
-        print("usage: tk chat.mg <url> [model]")
+        print("usage: tk chat.rk <url> [model]")
         return error.new("missing server url")
     }
     base := normalize(a[0])
