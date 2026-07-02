@@ -1008,8 +1008,12 @@ impl Checker {
                             if !matches!(t, Type::Str | Type::Unknown) {
                                 self.diag(line, col, format!("{name} format must be str, got {t}"));
                             }
-                            for a in &args[1..] {
-                                self.expr_one(a, None);
+                            let arg_tys: Vec<Type> =
+                                args[1..].iter().map(|a| self.expr_one(a, None)).collect();
+                            // a literal format is verified here; anything
+                            // else stays a runtime check
+                            if let ExprKind::Str(fmt) = &args[0].kind {
+                                self.check_format(name, fmt, &arg_tys, line, col);
                             }
                         }
                         return ExprTy::One(if name == "sprintf" { Type::Str } else { Type::Unit });
@@ -1060,6 +1064,70 @@ impl Checker {
             t => {
                 self.diag(line, col, format!("not callable: {t}"));
                 ExprTy::One(Type::Unknown)
+            }
+        }
+    }
+
+    /// Statically checks a literal printf/sprintf format against the
+    /// argument types. Mirrors the runtime verb table.
+    fn check_format(&mut self, name: &str, fmt: &str, arg_tys: &[Type], line: u32, col: u32) {
+        let mut verbs = vec![];
+        let mut chars = fmt.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c != '%' {
+                continue;
+            }
+            if chars.peek() == Some(&'%') {
+                chars.next();
+                continue;
+            }
+            // width and precision
+            while chars.peek().is_some_and(|d| d.is_ascii_digit()) {
+                chars.next();
+            }
+            if chars.peek() == Some(&'.') {
+                chars.next();
+                while chars.peek().is_some_and(|d| d.is_ascii_digit()) {
+                    chars.next();
+                }
+            }
+            match chars.next() {
+                Some(v) => verbs.push(v),
+                None => {
+                    self.diag(line, col, format!("{name}: format ends inside a verb"));
+                    return;
+                }
+            }
+        }
+        if verbs.len() != arg_tys.len() {
+            self.diag(
+                line,
+                col,
+                format!(
+                    "{name}: wrong argument count ({} verbs, {} args)",
+                    verbs.len(),
+                    arg_tys.len()
+                ),
+            );
+            return;
+        }
+        for (v, t) in verbs.iter().zip(arg_tys) {
+            if *t == Type::Unknown {
+                continue;
+            }
+            let want = match v {
+                'v' => continue,
+                'd' => Type::Int,
+                's' | 'q' => Type::Str,
+                't' => Type::Bool,
+                'f' => Type::Float,
+                _ => {
+                    self.diag(line, col, format!("{name}: unknown verb %{v}"));
+                    continue;
+                }
+            };
+            if *t != want {
+                self.diag(line, col, format!("{name}: %{v} needs {want}, got {t}"));
             }
         }
     }
