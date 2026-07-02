@@ -1,16 +1,28 @@
 import "file"
 
 fn main() error? {
-  name := "data.txt"
+  name := "./data.txt"
   s, err := file.read(name)
   if err != none {
     printf("can't read file %s", name)
     return err
   }
   l := []int{}
-  for i, c := range s {
-    l = append(l, int(c))
+  lines := s.lines()
+  for i, line := range lines {
+      for k, c := range line {
+        if c == " " { continue }   
+        printf("index %d char %s ascii %d\n", i, c, ord(c))
+        num, err := int(c)
+        if err != none {
+          print("invalide number", c)
+        }
+        // or could do
+        // l = append(l, check int(c))
+        l = append(l, num)
+      }
   }
-  printf("%v", l)
+  
+  printf("%v\n", l)
   return none
 }
