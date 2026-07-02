@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod bridge;
 pub mod builtins;
 pub mod diag;
 pub mod interp;

@@ -9,6 +9,9 @@ use crate::types::Type;
 pub enum ExprTy {
     One(Type),
     Multi(Vec<Type>),
+    /// A chain of py operations: acts as `py` inside further postfix ops and
+    /// as `(py, error?)` at the point of consumption.
+    PyChain,
 }
 
 pub fn check(prog: &Program) -> Result<(), Vec<Diag>> {
@@ -329,6 +332,7 @@ impl Checker {
                 let supplied = match ty {
                     ExprTy::One(t) => vec![t],
                     ExprTy::Multi(ts) => ts,
+                    ExprTy::PyChain => vec![Type::Py, err_opt()],
                 };
                 if names.len() == supplied.len() {
                     for (n, t) in names.iter().zip(supplied) {
@@ -366,6 +370,10 @@ impl Checker {
                     },
                     ExprKind::Index { .. } | ExprKind::Field { .. } => {
                         match self.check_expr(target, None) {
+                            ExprTy::PyChain => {
+                                self.diag(line, col, "cannot assign into a py expression");
+                                Type::Unknown
+                            }
                             ExprTy::One(t) => match (&target.kind, t) {
                                 // map read is V?, but assignment writes a V
                                 (ExprKind::Index { recv, .. }, t) => {
@@ -397,6 +405,9 @@ impl Checker {
             StmtKind::Expr(e) => {
                 let ty = self.check_expr(e, None);
                 match ty {
+                    ExprTy::PyChain => {
+                        self.diag(line, col, "error result must be handled");
+                    }
                     ExprTy::Multi(ts) if ts.last() == Some(&err_opt()) => {
                         self.diag(line, col, "error result must be handled");
                     }
@@ -585,6 +596,23 @@ impl Checker {
                 self.diag(e.line, e.col, "multiple values in single-value context");
                 Type::Unknown
             }
+            ExprTy::PyChain => {
+                self.diag(e.line, e.col, "error result must be handled");
+                Type::Py
+            }
+        }
+    }
+
+    /// Like expr_one but lets a py chain through as `py` (for contexts that
+    /// absorb its fallibility: conversions, operators, further chain links).
+    fn expr_pyish(&mut self, e: &Expr, expected: Option<&Type>) -> Type {
+        match self.check_expr(e, expected) {
+            ExprTy::One(t) => t,
+            ExprTy::Multi(_) => {
+                self.diag(e.line, e.col, "multiple values in single-value context");
+                Type::Unknown
+            }
+            ExprTy::PyChain => Type::Py,
         }
     }
 
@@ -685,12 +713,30 @@ impl Checker {
                     }
                 }
             }
-            K::Binary { op, lhs, rhs } => one(self.binary(*op, lhs, rhs, line, col)),
+            K::Binary { op, lhs, rhs } => {
+                let t = self.binary(*op, lhs, rhs, line, col);
+                if t == Type::Py {
+                    ExprTy::PyChain
+                } else {
+                    one(t)
+                }
+            }
             K::Call { callee, args } => self.call(callee, args, line, col),
             K::Method { recv, name, args } => self.method(recv, name, args, line, col),
-            K::Field { recv, name } => one(self.field(recv, name, line, col)),
+            K::Field { recv, name } => {
+                let t = self.field(recv, name, line, col);
+                if t == Type::Py {
+                    ExprTy::PyChain
+                } else {
+                    one(t)
+                }
+            }
             K::Index { recv, idx } => {
-                let rt = self.expr_one(recv, None);
+                let rt = self.expr_pyish(recv, None);
+                if rt == Type::Py {
+                    self.expr_one(idx, None);
+                    return ExprTy::PyChain;
+                }
                 match rt {
                     Type::List(t) => {
                         let it = self.expr_one(idx, Some(&Type::Int));
@@ -745,6 +791,7 @@ impl Checker {
                 let parts = match ty {
                     ExprTy::One(t) => vec![t],
                     ExprTy::Multi(ts) => ts,
+                    ExprTy::PyChain => vec![Type::Py, err_opt()],
                 };
                 if parts.last() != Some(&err_opt()) && parts.last() != Some(&Type::Unknown) {
                     self.diag(line, col, "check needs a fallible expression");
@@ -759,7 +806,7 @@ impl Checker {
             }
             K::Conv { target, arg } => {
                 let t = self.resolve(target, line, col);
-                let at = self.expr_one(arg, None);
+                let at = self.expr_pyish(arg, None);
                 let ok = match (&t, &at) {
                     (_, Type::Py) | (_, Type::Unknown) => true,
                     (Type::Int, Type::Int | Type::Float | Type::Str) => true,
@@ -778,8 +825,15 @@ impl Checker {
     }
 
     fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, line: u32, col: u32) -> Type {
-        let lt = self.expr_one(lhs, None);
-        let rt = self.expr_one(rhs, Some(&lt));
+        let lt = self.expr_pyish(lhs, None);
+        let rt = self.expr_pyish(rhs, Some(&lt));
+        if lt == Type::Py || rt == Type::Py {
+            if matches!(op, BinOp::And | BinOp::Or) {
+                self.diag(line, col, "&& and || need bool, got py");
+                return Type::Unknown;
+            }
+            return Type::Py;
+        }
         let unknown = lt == Type::Unknown || rt == Type::Unknown;
         match op {
             BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Rem => {
@@ -908,7 +962,13 @@ impl Checker {
                 }
             }
         }
-        let ct = self.expr_one(callee, None);
+        let ct = self.expr_pyish(callee, None);
+        if ct == Type::Py {
+            for a in args {
+                self.expr_one(a, None);
+            }
+            return ExprTy::PyChain;
+        }
         match ct {
             Type::Fn(params, rets) => {
                 self.check_args(&params, args, line, col);
@@ -954,7 +1014,13 @@ impl Checker {
                 };
             }
         }
-        let rt = self.expr_one(recv, None);
+        let rt = self.expr_pyish(recv, None);
+        if rt == Type::Py {
+            for a in args {
+                self.expr_one(a, None);
+            }
+            return ExprTy::PyChain;
+        }
         match &rt {
             Type::Module(m) if matches!(self.imports.get(m), Some(ImportKind::File(_))) => {
                 let mangled = format!("{m}.{name}");
@@ -1157,7 +1223,10 @@ impl Checker {
     }
 
     fn field(&mut self, recv: &Expr, name: &str, line: u32, col: u32) -> Type {
-        let rt = self.expr_one(recv, None);
+        let rt = self.expr_pyish(recv, None);
+        if rt == Type::Py {
+            return Type::Py;
+        }
         match &rt {
             Type::Struct(s) => match self.structs.get(s).and_then(|fs| {
                 fs.iter().find(|(f, _)| f == name).map(|(_, t)| t.clone())

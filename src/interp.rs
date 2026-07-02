@@ -18,17 +18,19 @@ pub enum Flow {
     Continue,
 }
 
-/// Expression result: a value, or an early function return triggered by `check`.
+/// Expression result: a value, an early function return triggered by
+/// `check`, or a Python exception looking for its chain's handler.
 pub enum Ev {
     V(Value),
     Ret(Value),
+    PyErr(ErrVal),
 }
 
 macro_rules! val {
     ($e:expr) => {
         match $e? {
             Ev::V(v) => v,
-            r @ Ev::Ret(_) => return Ok(r),
+            r => return Ok(r),
         }
     };
 }
@@ -39,6 +41,13 @@ macro_rules! sval {
         match $e? {
             Ev::V(v) => v,
             Ev::Ret(r) => return Ok(Flow::Return(r)),
+            // the checker forces py chains into check or destructure
+            Ev::PyErr(e) => {
+                return Err(Fault {
+                    msg: format!("unhandled python error: {}", e.msg),
+                    stack: vec![],
+                })
+            }
         }
     };
 }
@@ -47,6 +56,7 @@ pub struct Interp<'p> {
     fns: HashMap<String, &'p FnDecl>,
     pub(crate) structs: HashMap<String, Vec<(String, TypeExpr)>>,
     globals: HashMap<String, Value>,
+    py_imports: Vec<String>,
     scopes: Vec<HashMap<String, Value>>,
     saved: Vec<Vec<HashMap<String, Value>>>,
     /// Return types of the active function, for zero-filling check returns.
@@ -60,6 +70,7 @@ impl<'p> Interp<'p> {
         let mut fns = HashMap::new();
         let mut structs = HashMap::new();
         let mut globals = HashMap::new();
+        let mut py_imports = vec![];
         for d in &prog.decls {
             match d {
                 Decl::Fn(f) => {
@@ -96,7 +107,9 @@ impl<'p> Interp<'p> {
                             );
                         }
                     }
-                    // py imports land with the bridge
+                    if *py {
+                        py_imports.push(path.clone());
+                    }
                 }
             }
         }
@@ -104,6 +117,7 @@ impl<'p> Interp<'p> {
             fns,
             structs,
             globals,
+            py_imports,
             scopes: vec![],
             saved: vec![],
             ret_stack: vec![],
@@ -118,6 +132,16 @@ impl<'p> Interp<'p> {
 
     /// Run fn main. Returns main's error value if it returned one.
     pub fn run_main(&mut self) -> Result<Option<ErrVal>, Fault> {
+        for m in self.py_imports.clone() {
+            match crate::bridge::import(&m) {
+                Ok(h) => {
+                    self.globals.insert(m, Value::Py(h));
+                }
+                Err(e) => {
+                    return Err(self.fault(format!("import py \"{m}\": {}", e.msg)))
+                }
+            }
+        }
         let v = self.call_named("main", vec![])?;
         Ok(match v {
             Value::Err(e) => Some(e),
@@ -159,6 +183,10 @@ impl<'p> Interp<'p> {
             if let StmtKind::Expr(e) = &c.body[0].kind {
                 match self.eval(e) {
                     Ok(Ev::V(v)) | Ok(Ev::Ret(v)) => Ok(Flow::Return(v)),
+                    Ok(Ev::PyErr(e)) => Err(Fault {
+                        msg: format!("unhandled python error: {}", e.msg),
+                        stack: vec![],
+                    }),
                     Err(f) => Err(f),
                 }
             } else {
@@ -225,10 +253,27 @@ impl<'p> Interp<'p> {
     fn exec_stmt(&mut self, s: &Stmt) -> Result<Flow, Fault> {
         match &s.kind {
             StmtKind::Let { names, expr } => {
-                let v = sval!(self.eval(expr));
+                let v = match self.eval(expr)? {
+                    Ev::V(v) => v,
+                    Ev::Ret(r) => return Ok(Flow::Return(r)),
+                    Ev::PyErr(e) => {
+                        // py chain destructured: zero-fill values, bind error
+                        let mut parts = vec![Value::NoneV; names.len().saturating_sub(1)];
+                        parts.push(Value::Err(e));
+                        for (n, p) in names.iter().zip(parts) {
+                            if n != "_" {
+                                self.scopes.last_mut().unwrap().insert(n.clone(), p);
+                            }
+                        }
+                        return Ok(Flow::Normal);
+                    }
+                };
                 let parts = if names.len() > 1 {
                     match v {
                         Value::Tuple(ts) => ts,
+                        // a successful py chain is one value plus an empty
+                        // error slot
+                        one @ Value::Py(_) if names.len() == 2 => vec![one, Value::NoneV],
                         one => vec![one],
                     }
                 } else {
@@ -250,6 +295,10 @@ impl<'p> Interp<'p> {
                 let v = sval!(self.eval(expr));
                 match self.assign(target, v)? {
                     Ev::Ret(r) => Ok(Flow::Return(r)),
+                    Ev::PyErr(e) => Err(Fault {
+                        msg: format!("unhandled python error: {}", e.msg),
+                        stack: vec![],
+                    }),
                     Ev::V(_) => Ok(Flow::Normal),
                 }
             }
@@ -511,6 +560,12 @@ impl<'p> Interp<'p> {
                 }
                 let l = val!(self.eval(lhs));
                 let r = val!(self.eval(rhs));
+                if matches!(l, Value::Py(_)) || matches!(r, Value::Py(_)) {
+                    return Ok(match crate::bridge::binop(*op, &l, &r) {
+                        Ok(v) => Ev::V(v),
+                        Err(e) => Ev::PyErr(e),
+                    });
+                }
                 self.binop(*op, l, r).map(Ev::V)
             }
             K::Call { callee, args } => {
@@ -529,6 +584,12 @@ impl<'p> Interp<'p> {
                 let f = val!(self.eval(callee));
                 for a in args {
                     vals.push(val!(self.eval(a)));
+                }
+                if let Value::Py(h) = &f {
+                    return Ok(match crate::bridge::call(h, &vals) {
+                        Ok(v) => Ev::V(v),
+                        Err(e) => Ev::PyErr(e),
+                    });
                 }
                 self.call_value(&f, vals).map(Ev::V)
             }
@@ -549,15 +610,38 @@ impl<'p> Interp<'p> {
                 for a in args {
                     vals.push(val!(self.eval(a)));
                 }
+                if let Value::Py(h) = &r {
+                    let f = match crate::bridge::getattr(h, name) {
+                        Ok(v) => v,
+                        Err(e) => return Ok(Ev::PyErr(e)),
+                    };
+                    let Value::Py(fh) = &f else { unreachable!() };
+                    return Ok(match crate::bridge::call(fh, &vals) {
+                        Ok(v) => Ev::V(v),
+                        Err(e) => Ev::PyErr(e),
+                    });
+                }
                 self.method_call(r, name, vals).map(Ev::V)
             }
             K::Field { recv, name } => {
                 let r = val!(self.eval(recv));
+                if let Value::Py(h) = &r {
+                    return Ok(match crate::bridge::getattr(h, name) {
+                        Ok(v) => Ev::V(v),
+                        Err(e) => Ev::PyErr(e),
+                    });
+                }
                 self.field(r, name).map(Ev::V)
             }
             K::Index { recv, idx } => {
                 let r = val!(self.eval(recv));
                 let i = val!(self.eval(idx));
+                if let Value::Py(h) = &r {
+                    return Ok(match crate::bridge::index(h, &i) {
+                        Ok(v) => Ev::V(v),
+                        Err(e) => Ev::PyErr(e),
+                    });
+                }
                 self.index(r, i).map(Ev::V)
             }
             K::Slice { recv, lo, hi } => {
@@ -581,10 +665,18 @@ impl<'p> Interp<'p> {
                 }))))
             }
             K::Check(inner) => {
-                let v = val!(self.eval(inner));
+                let v = match self.eval(inner)? {
+                    Ev::V(v) => v,
+                    r @ Ev::Ret(_) => return Ok(r),
+                    Ev::PyErr(e) => Value::Tuple(vec![Value::NoneV, Value::Err(e)]),
+                };
                 let mut parts = match v {
                     Value::Tuple(ts) => ts,
-                    one => vec![one],
+                    // fn returning a lone error?: the value IS the error slot
+                    one @ (Value::Err(_) | Value::NoneV) => vec![one],
+                    // successful py chain: the value with an implicit empty
+                    // error slot
+                    other => vec![other, Value::NoneV],
                 };
                 let err_slot = parts.pop().unwrap_or(Value::Unit);
                 match err_slot {
@@ -612,7 +704,16 @@ impl<'p> Interp<'p> {
                 }
             }
             K::Conv { target, arg } => {
-                let v = val!(self.eval(arg));
+                let v = match self.eval(arg)? {
+                    Ev::V(v) => v,
+                    r @ Ev::Ret(_) => return Ok(r),
+                    Ev::PyErr(e) => {
+                        return Ok(Ev::V(Value::Tuple(vec![
+                            self.zero(target),
+                            Value::Err(e),
+                        ])))
+                    }
+                };
                 self.convert(target, v).map(Ev::V)
             }
         }

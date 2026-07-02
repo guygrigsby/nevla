@@ -52,6 +52,21 @@ impl Interp<'_> {
             TypeExpr::List(_) => "list",
             _ => return Err(self.fault("bad conversion target")),
         };
+        // py extraction goes through the bridge
+        if let Value::Py(h) = &v {
+            let spec = match target {
+                TypeExpr::Named(n) => n.clone(),
+                TypeExpr::List(inner) => match &**inner {
+                    TypeExpr::Named(n) => format!("list:{n}"),
+                    _ => return Err(self.fault("unsupported list conversion from py")),
+                },
+                _ => return Err(self.fault("bad conversion target")),
+            };
+            return Ok(match crate::bridge::extract(&spec, h) {
+                Ok(val) => Value::Tuple(vec![val, Value::NoneV]),
+                Err(e) => Value::Tuple(vec![self.zero(target), Value::Err(e)]),
+            });
+        }
         match (name, v) {
             ("int", Value::Int(i)) => ok(Value::Int(i)),
             ("int", Value::Float(f)) => ok(Value::Int(f as i64)),
@@ -376,6 +391,7 @@ pub fn render(v: &Value) -> String {
             format!("{name}{{{inner}}}")
         }
         Value::NoneV => "none".into(),
+        Value::Py(h) => crate::bridge::display(h),
         Value::Err(e) => format!("error({})", e.msg),
         Value::Fn(_) => "fn".into(),
         Value::Module(m) => format!("module {m}"),

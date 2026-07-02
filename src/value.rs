@@ -17,6 +17,8 @@ pub enum Value {
     /// The absent option value. Present option values are stored bare;
     /// the typechecker is what keeps them honest.
     NoneV,
+    /// Live Python object; reference semantics, the documented exception.
+    Py(crate::bridge::PyHandle),
     Err(ErrVal),
     Fn(FnRef),
     Module(String),
