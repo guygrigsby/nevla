@@ -1,3 +1,7 @@
+//! The static checking pass, run by `rikki check` and before every run.
+//! Terminology: "check" here is this pass; the language's `check` expression
+//! (ExprKind::Check) is a construct this pass validates like any other.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::*;
