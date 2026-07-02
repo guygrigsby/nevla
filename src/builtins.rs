@@ -193,7 +193,7 @@ impl Interp<'_> {
                     },
                     ("delete", Some(k)) => match crate::value::MapKey::from_value(&k) {
                         Some(key) => {
-                            let mut out = m.clone();
+                            let mut out = m;
                             out.shift_remove(&key);
                             Ok(Value::Map(out))
                         }
@@ -424,7 +424,7 @@ impl Interp<'_> {
         crate::stdlib::call(self, &module, name, args)
     }
 
-    pub(crate) fn module_const(&mut self, module: &str, name: &str) -> Result<Value, Fault> {
+    pub(crate) fn module_const(&self, module: &str, name: &str) -> Result<Value, Fault> {
         let module = module.to_string();
         crate::stdlib::constant(self, &module, name)
     }

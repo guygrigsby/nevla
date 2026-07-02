@@ -81,8 +81,12 @@ pub struct Interp<'p> {
     pub(crate) structs: HashMap<String, Vec<(String, TypeExpr)>>,
     globals: HashMap<String, Value>,
     py_imports: Vec<String>,
-    scopes: Vec<HashMap<String, Value>>,
-    saved: Vec<Vec<HashMap<String, Value>>>,
+    /// Scope frames are Rc so a closure call can push its captured frame
+    /// without deep-copying it; any write goes through Rc::make_mut, which
+    /// clones the frame first while ClosureData still holds a reference, so
+    /// captured environments stay observationally immutable (ADR 0009).
+    scopes: Vec<Rc<HashMap<String, Value>>>,
+    saved: Vec<Vec<Rc<HashMap<String, Value>>>>,
     /// Return types of the active function, for zero-filling check returns.
     ret_stack: Vec<Vec<TypeExpr>>,
     call_stack: Vec<String>,
@@ -149,11 +153,28 @@ impl<'p> Interp<'p> {
     fn bind(&mut self, name: String, v: Value) -> Result<(), Fault> {
         match self.scopes.last_mut() {
             Some(s) => {
-                s.insert(name, v);
+                Rc::make_mut(s).insert(name, v);
                 Ok(())
             }
             None => Err(self.fault("internal: no scope to bind into")),
         }
+    }
+
+    /// Borrow a variable without the deep copy: the fast path for reads
+    /// whose receiver is a bare identifier (xs[i], p.name, s[a:b]), so
+    /// indexing a large container clones only the element, not the
+    /// container. Returns None for fn names so the generic path keeps
+    /// producing fn values.
+    fn var_ref(&self, n: &str) -> Option<&Value> {
+        for s in self.scopes.iter().rev() {
+            if let Some(v) = s.get(n) {
+                return Some(v);
+            }
+        }
+        if self.fns.contains_key(n) {
+            return None;
+        }
+        self.globals.get(n)
     }
 
     /// Run fn main. Returns main's error value if it returned one.
@@ -211,7 +232,7 @@ impl<'p> Interp<'p> {
         for (p, a) in f.params.iter().zip(args) {
             scope.insert(p.name.clone(), a);
         }
-        self.enter(name.to_string(), vec![scope], f.ret.clone());
+        self.enter(name.to_string(), vec![Rc::new(scope)], f.ret.clone());
         let flow = self.exec_block_no_scope(&f.body);
         self.leave();
         match flow? {
@@ -229,7 +250,11 @@ impl<'p> Interp<'p> {
         for (p, a) in c.params.iter().zip(args) {
             scope.insert(p.name.clone(), a);
         }
-        self.enter("fn".into(), vec![c.captured.clone(), scope], c.ret.clone());
+        self.enter(
+            "fn".into(),
+            vec![Rc::clone(&c.captured), Rc::new(scope)],
+            c.ret.clone(),
+        );
         // expression body: a lone expression statement yields its value
         let flow = if c.body.len() == 1 {
             if let StmtKind::Expr(e) = &c.body[0].kind {
@@ -268,7 +293,7 @@ impl<'p> Interp<'p> {
         }
     }
 
-    fn enter(&mut self, name: String, scopes: Vec<HashMap<String, Value>>, ret: Vec<TypeExpr>) {
+    fn enter(&mut self, name: String, scopes: Vec<Rc<HashMap<String, Value>>>, ret: Vec<TypeExpr>) {
         self.call_stack.push(name);
         self.ret_stack.push(ret);
         self.saved.push(std::mem::replace(&mut self.scopes, scopes));
@@ -285,7 +310,7 @@ impl<'p> Interp<'p> {
     /// One persistent top-level scope for repl bindings.
     pub fn repl_init(&mut self) {
         if self.scopes.is_empty() {
-            self.scopes.push(HashMap::new());
+            self.scopes.push(Rc::new(HashMap::new()));
         }
     }
 
@@ -348,7 +373,7 @@ impl<'p> Interp<'p> {
     // ---------- statements ----------
 
     fn exec_block(&mut self, b: &Block) -> Result<Flow, Fault> {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(Rc::new(HashMap::new()));
         let r = self.exec_block_no_scope(b);
         self.scopes.pop();
         r
@@ -475,7 +500,7 @@ impl<'p> Interp<'p> {
                     _ => return Err(self.fault("cannot range over this value")),
                 };
                 for round in rounds {
-                    self.scopes.push(HashMap::new());
+                    self.scopes.push(Rc::new(HashMap::new()));
                     for (n, v) in names.iter().zip(round) {
                         if n != "_" {
                             self.bind(n.clone(), v)?;
@@ -519,6 +544,51 @@ impl<'p> Interp<'p> {
             Idx(Value),
             Field(String),
         }
+        fn assign_into(mut slot: &mut Value, steps: Vec<Step>, v: Value) -> Result<(), String> {
+            let n = steps.len();
+            for (i, st) in steps.into_iter().enumerate() {
+                let last = i + 1 == n;
+                match st {
+                    Step::Field(f) => match slot {
+                        Value::Struct { fields, .. } => match fields.get_mut(&f) {
+                            Some(x) => slot = x,
+                            None => return Err("unknown field".into()),
+                        },
+                        _ => return Err("cannot assign field here".into()),
+                    },
+                    Step::Idx(idx) => match slot {
+                        Value::List(items) => {
+                            let i = match idx {
+                                Value::Int(i) => i,
+                                _ => return Err("index must be int".into()),
+                            };
+                            let len = items.len() as i64;
+                            if i < 0 || i >= len {
+                                return Err(format!("index out of bounds: {i} of {len}"));
+                            }
+                            slot = &mut items[i as usize];
+                        }
+                        Value::Map(m) => {
+                            let Some(k) = MapKey::from_value(&idx) else {
+                                return Err("bad map key".into());
+                            };
+                            if last {
+                                m.insert(k, v);
+                                return Ok(());
+                            }
+                            match m.get_mut(&k) {
+                                Some(x) => slot = x,
+                                None => return Err("missing key".into()),
+                            }
+                        }
+                        Value::Str(_) => return Err("cannot assign into a string".into()),
+                        _ => return Err("cannot index this value".into()),
+                    },
+                }
+            }
+            *slot = v;
+            Ok(())
+        }
         let mut steps = vec![];
         let mut cur = target;
         loop {
@@ -526,71 +596,19 @@ impl<'p> Interp<'p> {
                 ExprKind::Ident(name) => {
                     let name = name.clone();
                     steps.reverse();
-                    // locate the variable
-                    let mut slot: Option<&mut Value> = None;
-                    for s in self.scopes.iter_mut().rev() {
-                        if let Some(x) = s.get_mut(&name) {
-                            slot = Some(x);
-                            break;
-                        }
-                    }
-                    let Some(mut slot) = slot else {
-                        return Err(Fault {
-                            msg: format!("undefined: {name}"),
-                            stack: self.call_stack.clone(),
-                        });
+                    // locate the frame read-only, then copy-on-write only it
+                    let Some(fi) = self.scopes.iter().rposition(|s| s.contains_key(&name)) else {
+                        return Err(self.fault(format!("undefined: {name}")));
                     };
-                    // descend
-                    let stack = self.call_stack.clone();
-                    let flt = |msg: &str| Fault {
-                        msg: msg.into(),
-                        stack: stack.clone(),
+                    let Some(slot) = Rc::make_mut(&mut self.scopes[fi]).get_mut(&name) else {
+                        return Err(self.fault(format!("undefined: {name}")));
                     };
-                    let n = steps.len();
-                    for (i, st) in steps.into_iter().enumerate() {
-                        let last = i + 1 == n;
-                        match st {
-                            Step::Field(f) => match slot {
-                                Value::Struct { fields, .. } => match fields.get_mut(&f) {
-                                    Some(x) => slot = x,
-                                    None => return Err(flt("unknown field")),
-                                },
-                                _ => return Err(flt("cannot assign field here")),
-                            },
-                            Step::Idx(idx) => match slot {
-                                Value::List(items) => {
-                                    let i = match idx {
-                                        Value::Int(i) => i,
-                                        _ => return Err(flt("index must be int")),
-                                    };
-                                    let len = items.len() as i64;
-                                    if i < 0 || i >= len {
-                                        return Err(flt(&format!(
-                                            "index out of bounds: {i} of {len}"
-                                        )));
-                                    }
-                                    slot = &mut items[i as usize];
-                                }
-                                Value::Map(m) => {
-                                    let Some(k) = MapKey::from_value(&idx) else {
-                                        return Err(flt("bad map key"));
-                                    };
-                                    if last {
-                                        m.insert(k, v);
-                                        return Ok(Ev::V(Value::Unit));
-                                    }
-                                    match m.get_mut(&k) {
-                                        Some(x) => slot = x,
-                                        None => return Err(flt("missing key")),
-                                    }
-                                }
-                                Value::Str(_) => return Err(flt("cannot assign into a string")),
-                                _ => return Err(flt("cannot index this value")),
-                            },
-                        }
+                    // descend; errors come back as messages so the rikki
+                    // stack is cloned only on the failure path
+                    match assign_into(slot, steps, v) {
+                        Ok(()) => return Ok(Ev::V(Value::Unit)),
+                        Err(msg) => return Err(self.fault(msg)),
                     }
-                    *slot = v;
-                    return Ok(Ev::V(Value::Unit));
                 }
                 ExprKind::Index { recv, idx } => {
                     let i = val!(self.eval(idx));
@@ -651,18 +669,20 @@ impl<'p> Interp<'p> {
                 ok(Value::Map(m))
             }
             K::StructLit { name, fields } => {
-                let def = self
-                    .structs
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| self.fault(format!("unknown struct: {name}")))?;
+                if !self.structs.contains_key(name) {
+                    return Err(self.fault(format!("unknown struct: {name}")));
+                }
                 let mut vals = HashMap::new();
                 for (f, v) in fields {
                     vals.insert(f.clone(), val!(self.eval(v)));
                 }
-                // field order follows the declaration
+                // field order follows the declaration; def borrowed, not
+                // cloned, per literal
+                let Some(def) = self.structs.get(name) else {
+                    return Err(self.fault(format!("unknown struct: {name}")));
+                };
                 let mut out = IndexMap::new();
-                for (f, _) in &def {
+                for (f, _) in def {
                     match vals.remove(f) {
                         Some(v) => {
                             out.insert(f.clone(), v);
@@ -787,6 +807,18 @@ impl<'p> Interp<'p> {
                 self.method_call(r, name, vals).map(Ev::V)
             }
             K::Field { recv, name } => {
+                if let K::Ident(n) = &recv.kind {
+                    if let Some(r) = self.var_ref(n) {
+                        if let Value::Py(h) = r {
+                            let h = h.clone();
+                            return Ok(match crate::bridge::getattr(&h, name) {
+                                Ok(v) => Ev::V(v),
+                                Err(e) => Ev::PyErr(e),
+                            });
+                        }
+                        return self.field(r, name).map(Ev::V);
+                    }
+                }
                 let r = val!(self.eval(recv));
                 if let Value::Py(h) = &r {
                     return Ok(match crate::bridge::getattr(h, name) {
@@ -794,9 +826,27 @@ impl<'p> Interp<'p> {
                         Err(e) => Ev::PyErr(e),
                     });
                 }
-                self.field(r, name).map(Ev::V)
+                self.field(&r, name).map(Ev::V)
             }
             K::Index { recv, idx } => {
+                if let K::Ident(n) = &recv.kind {
+                    if self.var_ref(n).is_some() {
+                        let i = val!(self.eval(idx));
+                        // still bound: expressions cannot assign, so idx
+                        // evaluation cannot have unbound n
+                        let Some(r) = self.var_ref(n) else {
+                            return Err(self.fault(format!("undefined: {n}")));
+                        };
+                        if let Value::Py(h) = r {
+                            let h = h.clone();
+                            return Ok(match crate::bridge::index(&h, &i) {
+                                Ok(v) => Ev::V(v),
+                                Err(e) => Ev::PyErr(e),
+                            });
+                        }
+                        return self.index(r, i).map(Ev::V);
+                    }
+                }
                 let r = val!(self.eval(recv));
                 let i = val!(self.eval(idx));
                 if let Value::Py(h) = &r {
@@ -805,19 +855,29 @@ impl<'p> Interp<'p> {
                         Err(e) => Ev::PyErr(e),
                     });
                 }
-                self.index(r, i).map(Ev::V)
+                self.index(&r, i).map(Ev::V)
             }
             K::Slice { recv, lo, hi } => {
+                if let K::Ident(n) = &recv.kind {
+                    if self.var_ref(n).is_some() {
+                        let lo = val!(self.eval(lo));
+                        let hi = val!(self.eval(hi));
+                        let Some(r) = self.var_ref(n) else {
+                            return Err(self.fault(format!("undefined: {n}")));
+                        };
+                        return self.slice(r, lo, hi).map(Ev::V);
+                    }
+                }
                 let r = val!(self.eval(recv));
                 let lo = val!(self.eval(lo));
                 let hi = val!(self.eval(hi));
-                self.slice(r, lo, hi).map(Ev::V)
+                self.slice(&r, lo, hi).map(Ev::V)
             }
             K::Lambda { params, ret, body } => {
                 // capture by value: flatten visible scopes, inner shadows outer
                 let mut captured = HashMap::new();
                 for s in &self.scopes {
-                    for (k, v) in s {
+                    for (k, v) in s.iter() {
                         captured.insert(k.clone(), v.clone());
                     }
                 }
@@ -825,7 +885,7 @@ impl<'p> Interp<'p> {
                     params: params.clone(),
                     ret: ret.clone().unwrap_or_default(),
                     body: body.clone(),
-                    captured,
+                    captured: Rc::new(captured),
                 }))))
             }
             K::Check(inner) => {
@@ -887,6 +947,14 @@ impl<'p> Interp<'p> {
             Some(n) => Ok(Int(n)),
             None => Result::Err(self.fault("integer overflow")),
         };
+        // list concat consumes both operands; the match below only borrows
+        let (l, r) = match (op, l, r) {
+            (Add, List(mut a), List(b)) => {
+                a.extend(b);
+                return Ok(List(a));
+            }
+            (_, l, r) => (l, r),
+        };
         let v = match (op, &l, &r) {
             (Add, Int(a), Int(b)) => overflow(a.checked_add(*b))?,
             (Sub, Int(a), Int(b)) => overflow(a.checked_sub(*b))?,
@@ -908,11 +976,6 @@ impl<'p> Interp<'p> {
             (Mul, Float(a), Float(b)) => Float(a * b),
             (Div, Float(a), Float(b)) => Float(a / b),
             (Add, Str(a), Str(b)) => Str(format!("{a}{b}")),
-            (Add, List(a), List(b)) => {
-                let mut out = a.clone();
-                out.extend(b.iter().cloned());
-                List(out)
-            }
             (Eq, a, b) => Bool(a.eq_value(b)),
             (NotEq, a, b) => Bool(!a.eq_value(b)),
             (Lt, Int(a), Int(b)) => Bool(a < b),
@@ -932,7 +995,7 @@ impl<'p> Interp<'p> {
         Ok(v)
     }
 
-    fn field(&mut self, r: Value, name: &str) -> Result<Value, Fault> {
+    fn field(&self, r: &Value, name: &str) -> Result<Value, Fault> {
         match r {
             Value::Struct {
                 fields,
@@ -942,21 +1005,21 @@ impl<'p> Interp<'p> {
                 .cloned()
                 .ok_or_else(|| self.fault(format!("{sname} has no field {name}"))),
             Value::Err(e) => Ok(match name {
-                "msg" => Value::Str(e.msg),
-                "pytype" => Value::Str(e.pytype),
-                "traceback" => Value::Str(e.traceback),
-                "cause" => match e.cause {
-                    Some(c) => Value::Err(*c),
+                "msg" => Value::Str(e.msg.clone()),
+                "pytype" => Value::Str(e.pytype.clone()),
+                "traceback" => Value::Str(e.traceback.clone()),
+                "cause" => match &e.cause {
+                    Some(c) => Value::Err((**c).clone()),
                     None => Value::NoneV,
                 },
                 _ => return Err(self.fault(format!("error has no field {name}"))),
             }),
-            Value::Module(m) => self.module_const(&m, name),
+            Value::Module(m) => self.module_const(m, name),
             _ => Err(self.fault(format!("no field {name}"))),
         }
     }
 
-    fn index(&mut self, r: Value, i: Value) -> Result<Value, Fault> {
+    fn index(&self, r: &Value, i: Value) -> Result<Value, Fault> {
         match (r, i) {
             (Value::List(items), Value::Int(i)) => {
                 let len = items.len() as i64;
@@ -966,11 +1029,18 @@ impl<'p> Interp<'p> {
                 Ok(items[i as usize].clone())
             }
             (Value::Str(s), Value::Int(i)) => {
-                let len = s.chars().count() as i64;
-                if i < 0 || i >= len {
-                    return Err(self.fault(format!("index out of bounds: {i} of {len}")));
+                if i < 0 {
+                    return Err(
+                        self.fault(format!("index out of bounds: {i} of {}", s.chars().count()))
+                    );
                 }
-                Ok(Value::Str(s.chars().nth(i as usize).unwrap().to_string()))
+                match s.chars().nth(i as usize) {
+                    Some(c) => Ok(Value::Str(c.to_string())),
+                    None => {
+                        Err(self
+                            .fault(format!("index out of bounds: {i} of {}", s.chars().count())))
+                    }
+                }
             }
             (Value::Map(m), k) => {
                 let Some(key) = MapKey::from_value(&k) else {
@@ -982,7 +1052,7 @@ impl<'p> Interp<'p> {
         }
     }
 
-    fn slice(&mut self, r: Value, lo: Value, hi: Value) -> Result<Value, Fault> {
+    fn slice(&self, r: &Value, lo: Value, hi: Value) -> Result<Value, Fault> {
         let (Value::Int(a), Value::Int(b)) = (lo, hi) else {
             return Err(self.fault("slice bounds must be int"));
         };

@@ -21,7 +21,7 @@ pub fn call(
     }
 }
 
-pub fn constant(interp: &mut Interp, module: &str, name: &str) -> Result<Value, Fault> {
+pub fn constant(interp: &Interp, module: &str, name: &str) -> Result<Value, Fault> {
     match (module, name) {
         ("math", "pi") => Ok(Value::Float(std::f64::consts::PI)),
         ("math", "e") => Ok(Value::Float(std::f64::consts::E)),
