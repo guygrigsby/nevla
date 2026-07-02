@@ -45,6 +45,38 @@ pub fn run_source(path: &Path) -> RunResult {
         })
 }
 
+/// Print a run's output and map its exit kind to a process exit code.
+pub fn report(res: RunResult) -> std::process::ExitCode {
+    print!("{}", res.stdout);
+    match res.exit {
+        ExitKind::Ok => std::process::ExitCode::SUCCESS,
+        ExitKind::CompileError(m) | ExitKind::RuntimeError(m) => {
+            eprintln!("error: {m}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+/// Resolve the file a CLI command should operate on: the explicit arg if
+/// given, otherwise the enclosing project's src/main.mg.
+pub fn resolve_entry(file: Option<std::path::PathBuf>) -> Result<std::path::PathBuf, String> {
+    if let Some(f) = file {
+        return Ok(f);
+    }
+    let cwd = std::env::current_dir().map_err(|e| format!("cannot read cwd: {e}"))?;
+    let Some(root) = project::Project::find(&cwd) else {
+        return Err(
+            "no file given and no mongoose project found (no mongoose.toml in this or any parent directory)"
+                .into(),
+        );
+    };
+    let main = root.join("src").join("main.mg");
+    if !main.exists() {
+        return Err(format!("no file given and project entrypoint {} is missing", main.display()));
+    }
+    Ok(main)
+}
+
 /// Typecheck only; never provisions an environment or runs code.
 pub fn check_source(path: &Path) -> RunResult {
     compile_and(path, false)
