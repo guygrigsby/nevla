@@ -280,6 +280,90 @@ fn program_args_and_input() {
 }
 
 #[test]
+fn http_get_post_request_from_rikki() {
+    use std::io::Read;
+    // echoes the request line and whether the custom header and body arrived
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    std::thread::spawn(move || {
+        for _ in 0..3 {
+            let Ok((mut sock, _)) = listener.accept() else {
+                return;
+            };
+            sock.set_read_timeout(Some(std::time::Duration::from_millis(300)))
+                .unwrap();
+            let mut req = Vec::new();
+            let mut buf = [0u8; 4096];
+            while let Ok(n) = sock.read(&mut buf) {
+                if n == 0 {
+                    break;
+                }
+                req.extend_from_slice(&buf[..n]);
+                if req.windows(4).any(|w| w == b"\r\n\r\n") && !req.starts_with(b"P") {
+                    break; // no body expected past the headers
+                }
+                if String::from_utf8_lossy(&req).contains("hello")
+                    || String::from_utf8_lossy(&req).contains("data")
+                {
+                    break;
+                }
+            }
+            let req = String::from_utf8_lossy(&req).to_string();
+            let first = req.lines().next().unwrap_or("").to_string();
+            let body = format!(
+                "{first} hdr={} body={}",
+                req.contains("x-k: v"),
+                req.contains("hello") || req.contains("data"),
+            );
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = std::io::Write::write_all(&mut sock, resp.as_bytes());
+        }
+    });
+    let d = tempdir("http-req");
+    let f = d.join("h.rk");
+    std::fs::write(
+        &f,
+        r#"import "http"
+import "ctx"
+
+fn main() (error?) {
+    base := args()[0]
+    c := ctx.background()
+    r1 := check http.get(c, base + "one")
+    print(r1.status)
+    print(r1.body)
+    r2 := check http.post(c, base + "two", "hello")
+    print(r2.body)
+    req := Request{method: "PUT", url: base + "three", body: "data", headers: map[str]str{"x-k": "v"}}
+    r3 := check http.request(c, req)
+    print(r3.body)
+    return none
+}
+"#,
+    )
+    .unwrap();
+    let out = Command::new(tk())
+        .arg(&f)
+        .arg(format!("http://{addr}/"))
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains("200\n"), "{stdout}");
+    assert!(stdout.contains("GET /one HTTP/1.1 hdr=false body=false\n"), "{stdout}");
+    assert!(stdout.contains("POST /two HTTP/1.1 hdr=false body=true\n"), "{stdout}");
+    assert!(stdout.contains("PUT /three HTTP/1.1 hdr=true body=true\n"), "{stdout}");
+}
+
+#[test]
 fn http_stream_lines_reach_handler() {
     use std::io::Read;
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
