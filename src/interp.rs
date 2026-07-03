@@ -1,10 +1,14 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use indexmap::IndexMap;
 
 use crate::ast::*;
 use crate::value::{ClosureData, ErrVal, FnRef, MapKey, Value};
+
+/// A variable slot, shared between a scope and any closures capturing it.
+pub type Cell = Rc<RefCell<Value>>;
 
 /// Program output: buffered for tests and run_source, streamed for the CLI
 /// so interactive programs (input(), chat loops) work.
@@ -82,12 +86,11 @@ pub struct Interp<'p> {
     pub(crate) structs: HashMap<String, Vec<(String, TypeExpr)>>,
     globals: HashMap<String, Value>,
     py_imports: Vec<String>,
-    /// Scope frames are Rc so a closure call can push its captured frame
-    /// without deep-copying it; any write goes through Rc::make_mut, which
-    /// clones the frame first while ClosureData still holds a reference, so
-    /// captured environments stay observationally immutable (ADR 0009).
-    scopes: Vec<Rc<HashMap<String, Value>>>,
-    saved: Vec<Vec<Rc<HashMap<String, Value>>>>,
+    /// Scope slots are shared cells (ADR 0010): closures capture the cells
+    /// of their free variables, so reads and writes flow both ways between
+    /// a closure and its enclosing scope, Go's semantics.
+    scopes: Vec<HashMap<String, Cell>>,
+    saved: Vec<Vec<HashMap<String, Cell>>>,
     /// Return types of the active function, for zero-filling check returns.
     ret_stack: Vec<Vec<TypeExpr>>,
     call_stack: Vec<String>,
@@ -154,28 +157,21 @@ impl<'p> Interp<'p> {
     fn bind(&mut self, name: String, v: Value) -> Result<(), Fault> {
         match self.scopes.last_mut() {
             Some(s) => {
-                Rc::make_mut(s).insert(name, v);
+                s.insert(name, Rc::new(RefCell::new(v)));
                 Ok(())
             }
             None => Err(self.fault("internal: no scope to bind into")),
         }
     }
 
-    /// Borrow a variable without the deep copy: the fast path for reads
-    /// whose receiver is a bare identifier (xs[i], p.name, s[a:b]), so
-    /// indexing a large container clones only the element, not the
-    /// container. Returns None for fn names so the generic path keeps
-    /// producing fn values.
-    fn var_ref(&self, n: &str) -> Option<&Value> {
+    /// The cell holding `name`, innermost scope first.
+    fn lookup_cell(&self, n: &str) -> Option<Cell> {
         for s in self.scopes.iter().rev() {
-            if let Some(v) = s.get(n) {
-                return Some(v);
+            if let Some(c) = s.get(n) {
+                return Some(Rc::clone(c));
             }
         }
-        if self.fns.contains_key(n) {
-            return None;
-        }
-        self.globals.get(n)
+        None
     }
 
     /// Run fn main. Returns main's error value if it returned one.
@@ -231,9 +227,9 @@ impl<'p> Interp<'p> {
         }
         let mut scope = HashMap::new();
         for (p, a) in f.params.iter().zip(args) {
-            scope.insert(p.name.clone(), a);
+            scope.insert(p.name.clone(), Rc::new(RefCell::new(a)));
         }
-        self.enter(name.to_string(), vec![Rc::new(scope)], f.ret.clone());
+        self.enter(name.to_string(), vec![scope], f.ret.clone());
         let flow = self.exec_block_no_scope(&f.body);
         self.leave();
         match flow? {
@@ -249,13 +245,9 @@ impl<'p> Interp<'p> {
         }
         let mut scope = HashMap::new();
         for (p, a) in c.params.iter().zip(args) {
-            scope.insert(p.name.clone(), a);
+            scope.insert(p.name.clone(), Rc::new(RefCell::new(a)));
         }
-        self.enter(
-            "fn".into(),
-            vec![Rc::clone(&c.captured), Rc::new(scope)],
-            c.ret.clone(),
-        );
+        self.enter("fn".into(), vec![c.captured.clone(), scope], c.ret.clone());
         // expression body: a lone expression statement yields its value
         let flow = if c.body.len() == 1 {
             if let StmtKind::Expr(e) = &c.body[0].kind {
@@ -294,7 +286,7 @@ impl<'p> Interp<'p> {
         }
     }
 
-    fn enter(&mut self, name: String, scopes: Vec<Rc<HashMap<String, Value>>>, ret: Vec<TypeExpr>) {
+    fn enter(&mut self, name: String, scopes: Vec<HashMap<String, Cell>>, ret: Vec<TypeExpr>) {
         self.call_stack.push(name);
         self.ret_stack.push(ret);
         self.saved.push(std::mem::replace(&mut self.scopes, scopes));
@@ -311,7 +303,7 @@ impl<'p> Interp<'p> {
     /// One persistent top-level scope for repl bindings.
     pub fn repl_init(&mut self) {
         if self.scopes.is_empty() {
-            self.scopes.push(Rc::new(HashMap::new()));
+            self.scopes.push(HashMap::new());
         }
     }
 
@@ -374,7 +366,7 @@ impl<'p> Interp<'p> {
     // ---------- statements ----------
 
     fn exec_block(&mut self, b: &Block) -> Result<Flow, Fault> {
-        self.scopes.push(Rc::new(HashMap::new()));
+        self.scopes.push(HashMap::new());
         let r = self.exec_block_no_scope(b);
         self.scopes.pop();
         r
@@ -507,7 +499,7 @@ impl<'p> Interp<'p> {
                         _ => return Err(self.fault("cannot range over this value")),
                     };
                 for round in rounds {
-                    self.scopes.push(Rc::new(HashMap::new()));
+                    self.scopes.push(HashMap::new());
                     for (n, v) in names.iter().zip(round) {
                         if n != "_" {
                             self.bind(n.clone(), v)?;
@@ -558,7 +550,7 @@ impl<'p> Interp<'p> {
             let Some(v) = items.borrow().get(i).cloned() else {
                 break;
             };
-            self.scopes.push(Rc::new(HashMap::new()));
+            self.scopes.push(HashMap::new());
             for (name, val) in names.iter().zip([Value::Int(i as i64), v]) {
                 if name != "_" {
                     self.bind(name.clone(), val)?;
@@ -589,7 +581,7 @@ impl<'p> Interp<'p> {
             let Some(v) = m.borrow().get(&k).cloned() else {
                 continue;
             };
-            self.scopes.push(Rc::new(HashMap::new()));
+            self.scopes.push(HashMap::new());
             for (name, val) in names.iter().zip([k.to_value(), v]) {
                 if name != "_" {
                     self.bind(name.clone(), val)?;
@@ -623,7 +615,7 @@ impl<'p> Interp<'p> {
                 Ok(None) => break,
                 Err(e) => return Err(self.fault(format!("py range: {}", e.msg))),
             };
-            self.scopes.push(Rc::new(HashMap::new()));
+            self.scopes.push(HashMap::new());
             for (n, v) in names.iter().zip([Value::Int(i), item]) {
                 if n != "_" {
                     self.bind(n.clone(), v)?;
@@ -777,8 +769,8 @@ impl<'p> Interp<'p> {
                 ExprKind::Ident(name) => {
                     let name = name.clone();
                     steps.reverse();
-                    // locate the frame read-only, then copy-on-write only it
-                    let Some(fi) = self.scopes.iter().rposition(|s| s.contains_key(&name)) else {
+                    // locate the variable's cell
+                    let Some(cell) = self.lookup_cell(&name) else {
                         // py imports live in globals; the name itself is not
                         // assignable but its referent is, through the handle
                         if !steps.is_empty() {
@@ -792,12 +784,14 @@ impl<'p> Interp<'p> {
                         }
                         return Err(self.fault(format!("undefined: {name}")));
                     };
-                    let Some(slot) = Rc::make_mut(&mut self.scopes[fi]).get_mut(&name) else {
-                        return Err(self.fault(format!("undefined: {name}")));
-                    };
                     // descend; errors come back as messages so the rikki
-                    // stack is cloned only on the failure path
-                    match assign_into(slot, steps, v) {
+                    // stack is cloned only on the failure path. The cell
+                    // borrow is safe: steps and value are already evaluated,
+                    // nothing below re-enters the evaluator.
+                    let Ok(mut slot) = cell.try_borrow_mut() else {
+                        return Err(self.fault("internal: variable cell aliased during assignment"));
+                    };
+                    match assign_into(&mut slot, steps, v) {
                         Ok(()) => return Ok(Ev::V(Value::Unit)),
                         Err(msg) => return Err(self.fault(msg)),
                     }
@@ -828,10 +822,9 @@ impl<'p> Interp<'p> {
             K::Bool(b) => ok(Value::Bool(*b)),
             K::NoneLit => ok(Value::NoneV),
             K::Ident(n) => {
-                for s in self.scopes.iter().rev() {
-                    if let Some(v) = s.get(n) {
-                        return ok(v.clone());
-                    }
+                if let Some(c) = self.lookup_cell(n) {
+                    let v = c.borrow().clone();
+                    return ok(v);
                 }
                 if self.fns.contains_key(n) {
                     return ok(Value::Fn(FnRef::Decl(n.clone())));
@@ -999,18 +992,6 @@ impl<'p> Interp<'p> {
                 self.method_call(r, name, vals).map(Ev::V)
             }
             K::Field { recv, name } => {
-                if let K::Ident(n) = &recv.kind {
-                    if let Some(r) = self.var_ref(n) {
-                        if let Value::Py(h) = r {
-                            let h = h.clone();
-                            return Ok(match crate::bridge::getattr(&h, name) {
-                                Ok(v) => Ev::V(v),
-                                Err(e) => Ev::PyErr(e),
-                            });
-                        }
-                        return self.field(r, name).map(Ev::V);
-                    }
-                }
                 let r = val!(self.eval(recv));
                 if let Value::Py(h) = &r {
                     return Ok(match crate::bridge::getattr(h, name) {
@@ -1021,24 +1002,6 @@ impl<'p> Interp<'p> {
                 self.field(&r, name).map(Ev::V)
             }
             K::Index { recv, idx } => {
-                if let K::Ident(n) = &recv.kind {
-                    if self.var_ref(n).is_some() {
-                        let i = val!(self.eval(idx));
-                        // still bound: expressions cannot assign, so idx
-                        // evaluation cannot have unbound n
-                        let Some(r) = self.var_ref(n) else {
-                            return Err(self.fault(format!("undefined: {n}")));
-                        };
-                        if let Value::Py(h) = r {
-                            let h = h.clone();
-                            return Ok(match crate::bridge::index(&h, &i) {
-                                Ok(v) => Ev::V(v),
-                                Err(e) => Ev::PyErr(e),
-                            });
-                        }
-                        return self.index(r, i).map(Ev::V);
-                    }
-                }
                 let r = val!(self.eval(recv));
                 let i = val!(self.eval(idx));
                 if let Value::Py(h) = &r {
@@ -1050,34 +1013,25 @@ impl<'p> Interp<'p> {
                 self.index(&r, i).map(Ev::V)
             }
             K::Slice { recv, lo, hi } => {
-                if let K::Ident(n) = &recv.kind {
-                    if self.var_ref(n).is_some() {
-                        let lo = val!(self.eval(lo));
-                        let hi = val!(self.eval(hi));
-                        let Some(r) = self.var_ref(n) else {
-                            return Err(self.fault(format!("undefined: {n}")));
-                        };
-                        return self.slice(r, lo, hi).map(Ev::V);
-                    }
-                }
                 let r = val!(self.eval(recv));
                 let lo = val!(self.eval(lo));
                 let hi = val!(self.eval(hi));
                 self.slice(&r, lo, hi).map(Ev::V)
             }
             K::Lambda { params, ret, body } => {
-                // capture by value: flatten visible scopes, inner shadows outer
+                // capture the cells of the body's free variables: closure
+                // and enclosing scope share them (ADR 0010, Go semantics)
                 let mut captured = HashMap::new();
-                for s in &self.scopes {
-                    for (k, v) in s.iter() {
-                        captured.insert(k.clone(), v.clone());
+                for name in free_vars(params, body) {
+                    if let Some(cell) = self.lookup_cell(&name) {
+                        captured.insert(name, cell);
                     }
                 }
                 ok(Value::Fn(FnRef::Closure(Rc::new(ClosureData {
                     params: params.clone(),
                     ret: ret.clone().unwrap_or_default(),
                     body: body.clone(),
-                    captured: Rc::new(captured),
+                    captured,
                 }))))
             }
             K::Check(inner) => {
@@ -1342,4 +1296,160 @@ impl<'p> Interp<'p> {
 
 pub fn truthy(v: &Value) -> bool {
     matches!(v, Value::Bool(true))
+}
+
+/// The free variables of a function literal: names its body reads that are
+/// neither parameters nor declared within. These are what it captures.
+fn free_vars(params: &[Param], body: &Block) -> HashSet<String> {
+    struct Fv {
+        free: HashSet<String>,
+        bound: Vec<HashSet<String>>,
+    }
+    impl Fv {
+        fn ident(&mut self, n: &str) {
+            if n != "_" && !self.bound.iter().any(|s| s.contains(n)) {
+                self.free.insert(n.to_string());
+            }
+        }
+        fn declare(&mut self, n: &str) {
+            if let Some(s) = self.bound.last_mut() {
+                s.insert(n.to_string());
+            }
+        }
+        fn block(&mut self, b: &Block) {
+            self.bound.push(HashSet::new());
+            for st in b {
+                self.stmt(st);
+            }
+            self.bound.pop();
+        }
+        fn stmt(&mut self, s: &Stmt) {
+            match &s.kind {
+                StmtKind::Let { names, expr } => {
+                    self.expr(expr);
+                    for n in names {
+                        self.declare(n);
+                    }
+                }
+                StmtKind::Assign { target, expr } => {
+                    self.expr(target);
+                    self.expr(expr);
+                }
+                StmtKind::Expr(e) => self.expr(e),
+                StmtKind::Return(es) => {
+                    for e in es {
+                        self.expr(e);
+                    }
+                }
+                StmtKind::If {
+                    cond,
+                    then,
+                    elifs,
+                    els,
+                } => {
+                    self.expr(cond);
+                    self.block(then);
+                    for (c, b) in elifs {
+                        self.expr(c);
+                        self.block(b);
+                    }
+                    if let Some(b) = els {
+                        self.block(b);
+                    }
+                }
+                StmtKind::ForRange { names, iter, body } => {
+                    self.expr(iter);
+                    self.bound.push(names.iter().cloned().collect());
+                    self.block(body);
+                    self.bound.pop();
+                }
+                StmtKind::ForCond { cond, body } => {
+                    if let Some(c) = cond {
+                        self.expr(c);
+                    }
+                    self.block(body);
+                }
+                StmtKind::Break | StmtKind::Continue => {}
+            }
+        }
+        fn expr(&mut self, e: &Expr) {
+            match &e.kind {
+                ExprKind::Ident(n) => self.ident(n),
+                ExprKind::Int(_)
+                | ExprKind::Float(_)
+                | ExprKind::Str(_)
+                | ExprKind::Bool(_)
+                | ExprKind::NoneLit => {}
+                ExprKind::List(items) | ExprKind::ListLit { items, .. } => {
+                    for it in items {
+                        self.expr(it);
+                    }
+                }
+                ExprKind::MapLit { entries, .. } => {
+                    for (k, v) in entries {
+                        self.expr(k);
+                        self.expr(v);
+                    }
+                }
+                ExprKind::StructLit { fields, .. } => {
+                    for (_, v) in fields {
+                        self.expr(v);
+                    }
+                }
+                ExprKind::Unary { rhs, .. } => self.expr(rhs),
+                ExprKind::Binary { lhs, rhs, .. } => {
+                    self.expr(lhs);
+                    self.expr(rhs);
+                }
+                ExprKind::Call {
+                    callee,
+                    args,
+                    kwargs,
+                } => {
+                    self.expr(callee);
+                    for a in args {
+                        self.expr(a);
+                    }
+                    for (_, v) in kwargs {
+                        self.expr(v);
+                    }
+                }
+                ExprKind::Method {
+                    recv, args, kwargs, ..
+                } => {
+                    self.expr(recv);
+                    for a in args {
+                        self.expr(a);
+                    }
+                    for (_, v) in kwargs {
+                        self.expr(v);
+                    }
+                }
+                ExprKind::Field { recv, .. } => self.expr(recv),
+                ExprKind::Index { recv, idx } => {
+                    self.expr(recv);
+                    self.expr(idx);
+                }
+                ExprKind::Slice { recv, lo, hi } => {
+                    self.expr(recv);
+                    self.expr(lo);
+                    self.expr(hi);
+                }
+                ExprKind::Lambda { params, body, .. } => {
+                    self.bound
+                        .push(params.iter().map(|p| p.name.clone()).collect());
+                    self.block(body);
+                    self.bound.pop();
+                }
+                ExprKind::Check(inner) => self.expr(inner),
+                ExprKind::Conv { arg, .. } => self.expr(arg),
+            }
+        }
+    }
+    let mut fv = Fv {
+        free: HashSet::new(),
+        bound: vec![params.iter().map(|p| p.name.clone()).collect()],
+    };
+    fv.block(body);
+    fv.free
 }

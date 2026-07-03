@@ -1,4 +1,5 @@
 fn main() {
+    // Go capture: the closure shares the variable, not a snapshot
     n := 1
     f := fn() int { return n }
     n = 2

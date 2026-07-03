@@ -698,27 +698,26 @@ big := nums.map(fn(x) { x * 2 }).filter(fn(x) { x > 2 }).sum()   // 18
 f := fn(x int) int { return x * 2 }
 ```
 
-Function literals capture by value: at the moment the literal is evaluated,
-the variables visible at that point are snapshotted (deep-copied, per value
-semantics), and the function body reads those copies. Later mutation of the
-originals is invisible to the closure, and the closure cannot mutate the
-originals:
+Function literals capture their free variables by reference, as in Go: the
+closure and the enclosing scope share the variable, and reads and writes
+flow both ways. Capture is per-variable (the names the body actually uses),
+so a closure keeps alive exactly what it references.
 
 ```
 n := 1
 f := fn() int { return n }
 n = 2
-print(f())    // 1
+print(f())    // 2: f shares n, it did not snapshot it
+
+total := 0
+add := fn(x int) { total = total + x }
+add(1)
+add(2)
+print(total)  // 3: the accumulator idiom works directly
 ```
 
-Because such a write could only ever land in the discarded copy, assignment
-to a captured name inside a function literal is a compile-time error
-("... is captured by value; writes inside a function literal do not
-escape"), including field and index assignment on a captured native value.
-The exception is a py-target assignment (section 13.2): captured `py`
-values copy the handle, not the referent, so writes through them genuinely
-escape. A captured mutable Python object is therefore the accumulator
-pattern for callbacks.
+Loop iteration variables are per-iteration bindings (Go 1.22 semantics):
+closures created in different rounds capture different variables.
 
 Top-level functions and imported modules are not captured; they resolve
 normally at call time.
@@ -1905,7 +1904,8 @@ Behavior:
   arrive, before the response completes (server-sent events are consumed this
   way). The returned `Response.body` holds the accumulated lines, newline
   terminated, so the program can reparse the full payload afterward; closures
-  capture by value and therefore cannot accumulate it themselves. Its default
+  historically could not accumulate it themselves (pre-ADR-0010 closures
+  captured by value); kept for compatibility. Its default
   deadline, absent a ctx deadline, is 300 seconds rather than 30.
 - Response header names are as received; values that are not valid strings
   read as `""`.

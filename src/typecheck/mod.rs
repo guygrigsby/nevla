@@ -45,9 +45,6 @@ struct Checker {
     current_ret: Vec<Type>,
     current_file: Option<String>,
     loop_depth: u32,
-    /// Scope depths at each enclosing function-literal boundary; names
-    /// resolving below the innermost are captured copies.
-    lambda_bases: Vec<usize>,
     diags: Vec<Diag>,
 }
 
@@ -264,18 +261,6 @@ impl Checker {
         None
     }
 
-    /// Whether `name` resolves outside the innermost function literal:
-    /// its capture is a by-value copy, so writes to it are silently lost.
-    fn is_captured(&self, name: &str) -> bool {
-        let Some(&base) = self.lambda_bases.last() else {
-            return false;
-        };
-        match self.scopes.iter().rposition(|s| s.vars.contains_key(name)) {
-            Some(d) => d < base,
-            None => false,
-        }
-    }
-
     fn declared(&self, name: &str) -> Option<Type> {
         for s in self.scopes.iter().rev() {
             if let Some(t) = s.vars.get(name) {
@@ -414,12 +399,6 @@ impl Checker {
                 let target_ty = match &target.kind {
                     ExprKind::Ident(n) => match self.declared(n) {
                         Some(t) => {
-                            if self.is_captured(n) {
-                                self.diag(
-                                    span,
-                                    format!("{n} is captured by value; writes inside a function literal do not escape"),
-                                );
-                            }
                             // assignment invalidates any narrowing
                             self.invalidate(n);
                             t
@@ -439,16 +418,6 @@ impl Checker {
                                 return false;
                             }
                             ExprTy::One(t) => {
-                                // mutating a captured copy is equally lost;
-                                // py targets never reach here (chains above)
-                                if let Some(n) = base_ident(target) {
-                                    if self.is_captured(n) {
-                                        self.diag(
-                                            span,
-                                            format!("{n} is captured by value; writes inside a function literal do not escape"),
-                                        );
-                                    }
-                                }
                                 match (&target.kind, t) {
                                     // map read is V?, but assignment writes a V
                                     (ExprKind::Index { recv, .. }, t) => {
@@ -702,15 +671,6 @@ impl Checker {
     }
 
     // ---------- expressions ----------
-}
-
-/// The identifier a field/index assignment chain bottoms out at.
-fn base_ident(e: &Expr) -> Option<&str> {
-    match &e.kind {
-        ExprKind::Ident(n) => Some(n),
-        ExprKind::Index { recv, .. } | ExprKind::Field { recv, .. } => base_ident(recv),
-        _ => None,
-    }
 }
 
 fn rets_ty(rets: Vec<Type>) -> ExprTy {

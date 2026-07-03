@@ -104,10 +104,9 @@ pub struct ClosureData {
     /// Declared return types, for zero-filling `check` early returns.
     pub ret: Vec<TypeExpr>,
     pub body: Block,
-    /// Captured-by-value snapshot of the visible scope, flattened. Rc so
-    /// calls push it as a frame without copying; frame writes copy-on-write
-    /// (see Interp::scopes), keeping this snapshot immutable.
-    pub captured: Rc<std::collections::HashMap<String, Value>>,
+    /// The cells of the literal's free variables (ADR 0010): shared with
+    /// the enclosing scope, so reads and writes flow both ways.
+    pub captured: std::collections::HashMap<String, Rc<RefCell<Value>>>,
 }
 
 impl Value {

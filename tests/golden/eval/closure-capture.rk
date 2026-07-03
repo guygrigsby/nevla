@@ -1,0 +1,29 @@
+fn main() {
+    // closures capture variables, not snapshots (Go semantics)
+    total := 0
+    f := fn(x int) {
+        total = total + x
+    }
+    f(1)
+    f(2)
+    print(total)
+    // writes in the enclosing scope are visible to the closure
+    n := 1
+    g := fn() int { return n }
+    n = 2
+    print(g())
+    // the Go accumulator idiom: rebinding through append escapes
+    acc := []int{}
+    add := fn(x int) {
+        acc = append(acc, x)
+    }
+    add(7)
+    add(8)
+    print(acc)
+    // loop variables are per-iteration (Go 1.22)
+    fs := []fn() int{}
+    for i := range 3 {
+        fs = append(fs, fn() int { return i })
+    }
+    print(fs[0]() + fs[1]() + fs[2]())
+}

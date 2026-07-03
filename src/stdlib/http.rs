@@ -214,8 +214,9 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
 }
 
 /// POST with a per-line callback: the handler sees each response line as it
-/// arrives (SSE-friendly); the returned Response carries the accumulated
-/// body, since capture-by-value closures cannot collect state themselves.
+/// arrives (SSE-friendly). The returned Response still carries the
+/// accumulated body: a pre-ADR-0010 apology (closures could not accumulate
+/// then), kept for compatibility.
 fn stream(interp: &mut Interp, args: Vec<Value>) -> Result<Value, Fault> {
     let [Value::Ctx(ctx), Value::Str(url), Value::Str(body), handler @ Value::Fn(_)] =
         args.as_slice()
