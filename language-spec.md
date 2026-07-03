@@ -1539,7 +1539,9 @@ A `py` value supports:
   is a reference type; this is the mutation that references exist for.
   Assignment is a statement with no error slot, so a Python exception (or
   an unconvertible value) here faults ("py assignment: ..."), unlike the
-  expression operations below;
+  expression operations below. The assigned value may itself be a py
+  chain; the assignment absorbs it, and a chain exception faults the same
+  way;
 - the binary operators `+ - * / % @ == != < <= > >=` when either operand
   is `py`, dispatched to the corresponding Python operation and yielding
   `py` (comparisons included: the result is a Python bool as a `py` value,

@@ -11,8 +11,8 @@ fn main() (error?) {
     d["labels"] = 7
     v := check int(d["labels"])
     print(v)
-    // overwrite through a nested chain: dict value is a list
-    d["xs"] = check json.loads("[1, 2, 3]")
+    // the value side may be a bare py chain: the assignment absorbs it
+    d["xs"] = json.loads("[1, 2, 3]")
     d["xs"][0] = 9
     first := check int(d["xs"][0])
     print(first)

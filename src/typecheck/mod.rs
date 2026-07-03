@@ -413,8 +413,10 @@ impl Checker {
                             ExprTy::PyChain => {
                                 // assignment into a py target: any value; the
                                 // bridge's inbound table (13.5) governs at
-                                // runtime, and an exception there faults
-                                self.expr_one(expr, None);
+                                // runtime, and an exception there faults. A
+                                // py-chain value is absorbed: its exception
+                                // faults exactly like the assignment's own.
+                                self.expr_pyish(expr, None);
                                 return false;
                             }
                             ExprTy::One(t) => {
