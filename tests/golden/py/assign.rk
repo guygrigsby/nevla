@@ -1,0 +1,20 @@
+import py "json"
+import py "builtins"
+
+fn main() (error?) {
+    // setattr on a module object, read back through the chain
+    json.rikki_probe = 42
+    n := check int(json.rikki_probe)
+    print(n)
+    // setitem on a dict, read back
+    d := check builtins.dict()
+    d["labels"] = 7
+    v := check int(d["labels"])
+    print(v)
+    // overwrite through a nested chain: dict value is a list
+    d["xs"] = check json.loads("[1, 2, 3]")
+    d["xs"][0] = 9
+    first := check int(d["xs"][0])
+    print(first)
+    return none
+}

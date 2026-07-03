@@ -1458,7 +1458,9 @@ The complete set of fault conditions reachable from checked programs:
   (section 7.7).
 
 Float arithmetic never faults (section 5.1). Reading a map never faults.
-Python exceptions are not faults; they become error values (chapter 13).
+Python exceptions are not faults; they become error values (chapter 13) --
+except in assignment into a py target, a statement with no error slot,
+where an exception faults (section 13.2).
 
 ## 13. The Python bridge
 
@@ -1481,6 +1483,13 @@ A `py` value supports:
 - calls `x(args...)` and method calls `x.m(args...)`, yielding `py`.
   Named arguments (`f(x, lr: 0.001)`) pass as Python keyword arguments;
 - subscript `x[i]`, yielding `py`;
+- assignment into attributes and subscripts (`x.attr = v`, `x[i] = v`,
+  including at the end of a longer chain): the value converts per the
+  inbound table of section 13.5, and the referent mutates in place. `py`
+  is a reference type; this is the mutation that references exist for.
+  Assignment is a statement with no error slot, so a Python exception (or
+  an unconvertible value) here faults ("py assignment: ..."), unlike the
+  expression operations below;
 - the binary operators `+ - * / % @ == != < <= > >=` when either operand
   is `py`, dispatched to the corresponding Python operation and yielding
   `py` (comparisons included: the result is a Python bool as a `py` value,
@@ -1489,8 +1498,8 @@ A `py` value supports:
   meaning on native operands (section 7.9).
 
 `&& ||` reject `py` operands; unary `!` and `-` are not defined on `py`;
-`py` values cannot be sliced, ranged over with `for`, used as conditions,
-or assigned into (`x.attr = v`, `x[i] = v` are compile-time errors).
+`py` values cannot be sliced, ranged over with `for`, or used as
+conditions.
 
 ### 13.3 Fallibility
 

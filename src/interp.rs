@@ -545,10 +545,44 @@ impl<'p> Interp<'p> {
             Idx(Value),
             Field(String),
         }
-        fn assign_into(mut slot: &mut Value, steps: Vec<Step>, v: Value) -> Result<(), String> {
+        fn py_assign(
+            h: &crate::bridge::PyHandle,
+            steps: Vec<Step>,
+            v: Value,
+        ) -> Result<(), String> {
+            let mut cur = h.clone();
             let n = steps.len();
             for (i, st) in steps.into_iter().enumerate() {
+                if i + 1 == n {
+                    let r = match st {
+                        Step::Field(f) => crate::bridge::setattr(&cur, &f, &v),
+                        Step::Idx(k) => crate::bridge::setitem(&cur, &k, &v),
+                    };
+                    return r.map_err(|e| format!("py assignment: {}", e.msg));
+                }
+                let next = match st {
+                    Step::Field(f) => crate::bridge::getattr(&cur, &f),
+                    Step::Idx(k) => crate::bridge::index(&cur, &k),
+                }
+                .map_err(|e| format!("py assignment: {}", e.msg))?;
+                match next {
+                    Value::Py(nh) => cur = nh,
+                    _ => return Err("py assignment: chain left python".into()),
+                }
+            }
+            // steps are nonempty by construction; the loop always returns
+            Err("py assignment: empty path".into())
+        }
+        fn assign_into(mut slot: &mut Value, steps: Vec<Step>, v: Value) -> Result<(), String> {
+            let n = steps.len();
+            let mut iter = steps.into_iter().enumerate();
+            while let Some((i, st)) = iter.next() {
                 let last = i + 1 == n;
+                // a py value on the path takes the rest through the bridge
+                if let Value::Py(h) = slot {
+                    let rest: Vec<Step> = std::iter::once(st).chain(iter.map(|(_, s)| s)).collect();
+                    return py_assign(h, rest, v);
+                }
                 match st {
                     Step::Field(f) => match slot {
                         Value::Struct { fields, .. } => match fields.get_mut(&f) {
@@ -599,6 +633,17 @@ impl<'p> Interp<'p> {
                     steps.reverse();
                     // locate the frame read-only, then copy-on-write only it
                     let Some(fi) = self.scopes.iter().rposition(|s| s.contains_key(&name)) else {
+                        // py imports live in globals; the name itself is not
+                        // assignable but its referent is, through the handle
+                        if !steps.is_empty() {
+                            if let Some(Value::Py(h)) = self.globals.get(&name) {
+                                let h = h.clone();
+                                return match py_assign(&h, steps, v) {
+                                    Ok(()) => Ok(Ev::V(Value::Unit)),
+                                    Err(msg) => Err(self.fault(msg)),
+                                };
+                            }
+                        }
                         return Err(self.fault(format!("undefined: {name}")));
                     };
                     let Some(slot) = Rc::make_mut(&mut self.scopes[fi]).get_mut(&name) else {

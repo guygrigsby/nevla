@@ -411,8 +411,11 @@ impl Checker {
                     ExprKind::Index { .. } | ExprKind::Field { .. } => {
                         match self.check_expr(target, None) {
                             ExprTy::PyChain => {
-                                self.diag(span, "cannot assign into a py expression");
-                                Type::Unknown
+                                // assignment into a py target: any value; the
+                                // bridge's inbound table (13.5) governs at
+                                // runtime, and an exception there faults
+                                self.expr_one(expr, None);
+                                return false;
                             }
                             ExprTy::One(t) => match (&target.kind, t) {
                                 // map read is V?, but assignment writes a V

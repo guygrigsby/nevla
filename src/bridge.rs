@@ -150,6 +150,21 @@ pub fn call(h: &PyHandle, args: &[Value], kwargs: &[(String, Value)]) -> Result<
     })
 }
 
+pub fn setattr(h: &PyHandle, name: &str, v: &Value) -> Result<(), ErrVal> {
+    Python::attach(|py| {
+        let val = to_py(py, v)?;
+        h.0.bind(py).setattr(name, val).map_err(|e| errval(py, e))
+    })
+}
+
+pub fn setitem(h: &PyHandle, key: &Value, v: &Value) -> Result<(), ErrVal> {
+    Python::attach(|py| {
+        let k = to_py(py, key)?;
+        let val = to_py(py, v)?;
+        h.0.bind(py).set_item(k, val).map_err(|e| errval(py, e))
+    })
+}
+
 pub fn index(h: &PyHandle, idx: &Value) -> Result<Value, ErrVal> {
     Python::attach(|py| {
         let key = to_py(py, idx)?;
