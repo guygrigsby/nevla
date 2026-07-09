@@ -530,6 +530,13 @@ impl<'p> Interp<'p> {
                 }
                 Ok(Flow::Normal)
             }
+            StmtKind::With { expr, body } => {
+                let v = sval!(self, self.eval(expr));
+                let Value::Py(h) = v else {
+                    return Err(self.fault("with needs a py value"));
+                };
+                self.py_with(&h, body)
+            }
             StmtKind::Break => Ok(Flow::Break),
             StmtKind::Continue => Ok(Flow::Continue),
         }
@@ -631,6 +638,36 @@ impl<'p> Interp<'p> {
             i += 1;
         }
         Ok(Flow::Normal)
+    }
+
+    /// `with`: __enter__, body, __exit__ on every rikki-level exit. A return
+    /// carrying an error becomes a synthesized exception so exits that branch
+    /// on exception info (transactions) behave; a fault skips __exit__
+    /// entirely (spec 8.9). Exceptions from enter/exit fault.
+    #[inline(never)]
+    fn py_with(&mut self, h: &crate::bridge::PyHandle, body: &Block) -> Result<Flow, Fault> {
+        crate::bridge::enter(h).map_err(|e| self.fault(format!("py with: {}", e.msg)))?;
+        let flow = self.exec_block(body)?;
+        let err = match &flow {
+            Flow::Return(v) => match v {
+                Value::Err(e) => Some(e),
+                Value::Tuple(vs) => match vs.last() {
+                    Some(Value::Err(e)) => Some(e),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        };
+        let had_err = err.is_some();
+        let suppressed =
+            crate::bridge::exit(h, err).map_err(|e| self.fault(format!("py with: {}", e.msg)))?;
+        if suppressed && had_err {
+            // rikki control flow cannot be resurrected by a py call; loud
+            // beats silently continuing with zeroed results
+            return Err(self.fault("py with: __exit__ cannot suppress a rikki error"));
+        }
+        Ok(flow)
     }
 
     // ---------- assignment ----------
@@ -1367,6 +1404,10 @@ fn free_vars(params: &[Param], body: &Block) -> HashSet<String> {
                     if let Some(c) = cond {
                         self.expr(c);
                     }
+                    self.block(body);
+                }
+                StmtKind::With { expr, body } => {
+                    self.expr(expr);
                     self.block(body);
                 }
                 StmtKind::Break | StmtKind::Continue => {}

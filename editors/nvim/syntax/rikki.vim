@@ -3,7 +3,7 @@ if exists("b:current_syntax")
   finish
 endif
 
-syn keyword rikkiKeyword fn struct import return if else for range break continue check
+syn keyword rikkiKeyword fn struct import return if else for range break continue check with
 syn keyword rikkiType int float bool str error py map
 syn keyword rikkiBoolean true false
 syn keyword rikkiConstant none

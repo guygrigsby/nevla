@@ -169,6 +169,44 @@ pub fn next(h: &PyHandle) -> Result<Option<Value>, ErrVal> {
     })
 }
 
+// the exception __exit__ receives when a rikki error propagates out of a
+// `with` body; subclasses Exception so exits that branch on exception info
+// (transaction rollback, contextlib.suppress) see a real one
+pyo3::create_exception!(rikki, Error, pyo3::exceptions::PyException);
+
+/// `__enter__` for the with statement; the result is discarded (no binding
+/// form in v1).
+pub fn enter(h: &PyHandle) -> Result<(), ErrVal> {
+    Python::attach(|py| {
+        h.0.bind(py)
+            .call_method0("__enter__")
+            .map(|_| ())
+            .map_err(|e| errval(py, e))
+    })
+}
+
+/// `__exit__` for the with statement. None on a clean exit, the propagating
+/// error on an error-carrying return (synthesized as a `rikki.Error`
+/// exception, no traceback). Returns the result's truthiness so the caller
+/// can reject suppression attempts.
+pub fn exit(h: &PyHandle, err: Option<&ErrVal>) -> Result<bool, ErrVal> {
+    Python::attach(|py| {
+        let (ty, val) = match err {
+            None => (py.None(), py.None()),
+            Some(e) => {
+                let exc = Error::new_err(e.msg.clone());
+                let ty = exc.get_type(py).into_any().unbind();
+                let val = exc.value(py).clone().into_any().unbind();
+                (ty, val)
+            }
+        };
+        h.0.bind(py)
+            .call_method1("__exit__", (ty, val, py.None()))
+            .and_then(|r| r.is_truthy())
+            .map_err(|e| errval(py, e))
+    })
+}
+
 pub fn setattr(h: &PyHandle, name: &str, v: &Value) -> Result<(), ErrVal> {
     Python::attach(|py| {
         let val = to_py(py, v)?;

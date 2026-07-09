@@ -17,6 +17,7 @@ pub enum Token {
     Break,
     Continue,
     Check,
+    With,
     None_,
     True,
     False,

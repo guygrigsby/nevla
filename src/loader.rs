@@ -260,6 +260,10 @@ impl Renamer {
                 }
                 self.block(body);
             }
+            StmtKind::With { expr, body } => {
+                self.expr(expr);
+                self.block(body);
+            }
             StmtKind::Break | StmtKind::Continue => {}
         }
     }

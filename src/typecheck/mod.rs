@@ -605,6 +605,14 @@ impl Checker {
                 // infinite loop without break diverges
                 cond.is_none() && !contains_break(body)
             }
+            StmtKind::With { expr, body } => {
+                // the statement absorbs a py chain, like range
+                let t = self.expr_pyish(expr, None);
+                if !matches!(t, Type::Py | Type::Unknown) {
+                    self.diag(expr.span, format!("with needs a py value, got {t}"));
+                }
+                self.check_block(body)
+            }
             StmtKind::Break | StmtKind::Continue => {
                 if self.loop_depth == 0 {
                     self.diag(span, "break or continue outside loop");
@@ -703,7 +711,9 @@ fn assigned_idents(b: &Block, out: &mut Vec<String>) {
                     assigned_idents(b, out);
                 }
             }
-            StmtKind::ForRange { body, .. } | StmtKind::ForCond { body, .. } => {
+            StmtKind::ForRange { body, .. }
+            | StmtKind::ForCond { body, .. }
+            | StmtKind::With { body, .. } => {
                 assigned_idents(body, out);
             }
             _ => {}
@@ -721,6 +731,8 @@ fn contains_break(b: &Block) -> bool {
                 || elifs.iter().any(|(_, b)| contains_break(b))
                 || els.as_ref().is_some_and(contains_break)
         }
+        // a with is not a loop: its breaks belong to the enclosing one
+        StmtKind::With { body, .. } => contains_break(body),
         // breaks inside nested loops belong to those loops
         _ => false,
     })

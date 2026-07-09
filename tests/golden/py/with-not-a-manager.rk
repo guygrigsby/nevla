@@ -1,0 +1,8 @@
+import py "json"
+
+fn main() (error?) {
+    with json {
+        print("nope")
+    }
+    return none
+}

@@ -1,0 +1,34 @@
+import py "sqlite3"
+
+fn insert_fail(conn py) (error?) {
+    with conn {
+        check conn.execute("insert into t values (1)")
+        check conn.execute("nope not sql")
+    }
+    return none
+}
+
+fn insert_ok(conn py) (error?) {
+    with conn {
+        check conn.execute("insert into t values (2)")
+    }
+    return none
+}
+
+fn count(conn py) (int, error?) {
+    n := check conn.execute("select count(*) from t").fetchone()[0]
+    return check int(n), none
+}
+
+fn main() (error?) {
+    conn := check sqlite3.connect(":memory:")
+    check conn.execute("create table t (a)")
+
+    err := insert_fail(conn)
+    print(err != none)
+    print(check count(conn))
+
+    check insert_ok(conn)
+    print(check count(conn))
+    return none
+}

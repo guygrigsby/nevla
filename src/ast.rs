@@ -148,6 +148,11 @@ pub enum StmtKind {
         cond: Option<Expr>,
         body: Block,
     },
+    /// `with expr { ... }`: py context manager (spec 8.9).
+    With {
+        expr: Expr,
+        body: Block,
+    },
     Break,
     Continue,
 }

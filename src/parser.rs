@@ -392,6 +392,7 @@ impl Parser {
             }
             Some(Token::If) => self.if_stmt()?,
             Some(Token::For) => self.for_stmt()?,
+            Some(Token::With) => self.with_stmt()?,
             _ => {
                 // try: ident list := expr
                 let save = self.pos;
@@ -503,9 +504,16 @@ impl Parser {
         })
     }
 
+    fn with_stmt(&mut self) -> Result<StmtKind, Diag> {
+        self.expect(&Token::With, "with")?;
+        let expr = self.expr(false)?;
+        let body = self.block()?;
+        Ok(StmtKind::With { expr, body })
+    }
+
     // ---------- expressions ----------
 
-    /// `struct_ok` is false in if/for headers where `Name{` would swallow the block.
+    /// `struct_ok` is false in if/for/with headers where `Name{` would swallow the block.
     fn expr(&mut self, struct_ok: bool) -> Result<Expr, Diag> {
         self.enter()?;
         let r = self.binary(0, struct_ok);

@@ -180,7 +180,7 @@ The following identifiers are reserved and must not be used as names:
 ```
 break     check     continue  else      false     fn
 for       if        import    none      py        range
-return    struct    true
+return    struct    true      with
 ```
 
 `py` is a keyword; it also serves as the name of the `py` type (section 5.8)
@@ -656,8 +656,9 @@ Missing fields and unknown fields are compile-time errors. Field order in the
 literal is free; the constructed value's field order follows the declaration.
 
 Struct literals are suppressed in control-flow headers: in the condition of
-an `if` or `else if`, and in the header expression of a `for` statement
-(both the condition form and the operand of `range`), an identifier
+an `if` or `else if`, in the header expression of a `for` statement
+(both the condition form and the operand of `range`), and in the operand of
+a `with` statement, an identifier
 followed by `{` is not parsed as a struct literal, so the `{` opens the
 statement's block. To use a struct literal in a header, parenthesize it.
 Struct literals remain available inside any parenthesized or bracketed
@@ -1069,7 +1070,7 @@ expressions inside the target are then evaluated from the outermost
 ```
 Statement = ShortVarDecl | Assignment | ExpressionStmt
           | ReturnStmt | BreakStmt | ContinueStmt
-          | IfStmt | ForStmt .
+          | IfStmt | ForStmt | WithStmt .
 ```
 
 ### 8.1 Statement lists and terminators
@@ -1087,7 +1088,8 @@ positions of section 4.2 do not terminate a statement.
 
 A statement diverges when control cannot flow past it: `return`, `break`,
 `continue`, a `for` with no condition whose body contains no `break`
-lexically at its own level, and an `if` statement with an `else` block in
+lexically at its own level, a `with` whose body diverges, and an `if`
+statement with an `else` block in
 which the `then` block, every `else if` block, and the `else` block all
 diverge. An `if` without an `else` never diverges. A statement following a
 diverging statement in the same block is a compile-time error
@@ -1245,6 +1247,64 @@ ContinueStmt = "continue" .
 iteration. Either outside any loop is a compile-time error. Both diverge for
 the purposes of section 8.1.1: statements after them in the same block are
 unreachable.
+
+### 8.9 With statements
+
+```
+WithStmt = "with" Expression Block .
+```
+
+A `with` statement runs its block under a Python context manager. The
+operand must be `py`: a py chain (the statement absorbs it, like `range`;
+section 7.11) or a py-typed value. Any other operand type is a compile-time
+error ("with needs a py value").
+
+The operand is evaluated to a Python object and its `__enter__` method is
+called; the result is discarded. The block then runs as an ordinary block
+scope, and `__exit__` runs on every rikki-level exit from it:
+
+- On normal completion, on `break` or `continue` (which bind to an
+  enclosing loop as usual), and on a return whose final `error?` result is
+  `none` (or whose function declares no `error?` result), the call is
+  `__exit__(None, None, None)` and its return value is ignored. Control
+  then continues where it was headed.
+- On a return whose final `error?` result holds an error, whether written
+  explicitly or produced by `check` propagation, `__exit__` receives a
+  synthesized exception: an instance of a dedicated exception class
+  (a subclass of Python's `Exception`) carrying the error's rendered text,
+  passed as `__exit__(type, instance, None)`. A context manager whose exit
+  branches on exception state (a transaction commit/rollback, for example)
+  therefore sees the error path as Python would. If `__exit__` returns a
+  truthy value, which in Python suppresses the exception, the program
+  faults ("py with: `__exit__` cannot suppress a rikki error"): rikki
+  control flow cannot be resumed by a py call. On a falsy return the
+  return propagates unchanged.
+
+The statement has no error slot. A Python exception raised while
+evaluating the operand, by `__enter__`, or by `__exit__` faults
+("py with: ..."), the same rule as py assignment and py iteration
+(chapter 12). Fallible acquisition belongs before the statement:
+
+```
+import py "torch"
+
+fn eval_loss(model py, batch py) (float, error?) {
+    with torch.no_grad() {
+        out, err := model(batch)
+        if err != none {
+            return 0.0, err    // __exit__ sees the error as an exception
+        }
+        return check float(out.item()), none
+    }
+}
+```
+
+A fault raised inside the block terminates the program without calling
+`__exit__`: faults are not catchable and no construct observes one
+(chapter 12). A `with` whose body diverges diverges itself (section
+8.1.1). There is no binding form and no multi-operand form in v1; nest
+statements for multiple managers, and reach state through the manager
+object bound before the statement.
 
 ## 9. Flow narrowing
 
@@ -1505,13 +1565,16 @@ The complete set of fault conditions reachable from checked programs:
   (section 7.7);
 - structural comparison or bridge conversion of a value deeper than the
   implementation's depth limit (a cyclic value; section 11.1), and an
-  assignment whose path reaches the same container twice.
+  assignment whose path reaches the same container twice;
+- `__exit__` of a `with` statement returning truthy against a propagating
+  rikki error (section 8.9).
 
 Float arithmetic never faults (section 5.1). Reading a map never faults.
 Python exceptions are not faults; they become error values (chapter 13) --
-except in assignment into a py target and in `for range` over a py
-iterable (both statements with no error slot), where an exception faults
-(sections 13.2 and 8.7).
+except in assignment into a py target, in `for range` over a py
+iterable, and in the operand, `__enter__`, or `__exit__` of a `with`
+statement (all statements with no error slot), where an exception faults
+(sections 13.2, 8.7, and 8.9).
 
 ## 13. The Python bridge
 
@@ -1551,8 +1614,9 @@ A `py` value supports:
   meaning on native operands (section 7.9).
 
 `&& ||` reject `py` operands; unary `!` and `-` are not defined on `py`;
-`py` values can be ranged over with `for` (section 8.7) but cannot be
-sliced or used as conditions.
+`py` values can be ranged over with `for` (section 8.7) and run as context
+managers with `with` (section 8.9), but cannot be sliced or used as
+conditions.
 
 ### 13.3 Fallibility
 

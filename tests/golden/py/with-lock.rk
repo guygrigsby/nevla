@@ -1,0 +1,10 @@
+import py "threading"
+
+fn main() (error?) {
+    l := check threading.Lock()
+    with l {
+        print(check bool(l.locked()))
+    }
+    print(check bool(l.locked()))
+    return none
+}

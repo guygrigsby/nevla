@@ -1,0 +1,17 @@
+import "error"
+import py "contextlib"
+import py "builtins"
+
+fn boom(b bool) (error?) {
+    with contextlib.suppress(builtins.Exception) {
+        if b {
+            return error.new("bad")
+        }
+    }
+    return none
+}
+
+fn main() (error?) {
+    check boom(true)
+    return none
+}

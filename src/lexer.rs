@@ -168,6 +168,7 @@ impl<'a> Lexer<'a> {
                         "break" => Token::Break,
                         "continue" => Token::Continue,
                         "check" => Token::Check,
+                        "with" => Token::With,
                         "none" => Token::None_,
                         "true" => Token::True,
                         "false" => Token::False,
