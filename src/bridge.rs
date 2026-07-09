@@ -28,6 +28,18 @@ static INIT: Once = Once::new();
 /// site-packages should be importable; None means bare interpreter.
 pub fn init(venv: Option<&Path>) {
     INIT.call_once(|| {
+        // A wheel-installed binary embeds a python-build-standalone CPython
+        // whose baked prefix does not exist on this machine; without help,
+        // interpreter startup dies with "No module named 'encodings'".
+        // Point PYTHONHOME at a matching stdlib before initializing. An
+        // explicit PYTHONHOME wins; a normally linked system python that
+        // can already find its own home is unaffected by being handed the
+        // same prefix it would have found.
+        if std::env::var_os("PYTHONHOME").is_none() {
+            if let Some(home) = find_python_home(&embedded_python()) {
+                std::env::set_var("PYTHONHOME", home);
+            }
+        }
         if let Some(v) = venv {
             // CPython honors VIRTUAL_ENV only via activation scripts; the
             // reliable embed knob is PYTHONPATH to the venv's site-packages.
@@ -73,6 +85,40 @@ pub fn init(venv: Option<&Path>) {
             }
         }
     });
+}
+
+/// Find the base prefix of a CPython whose major.minor matches the embedded
+/// one: `pythonX.Y` on PATH, then `python3` if it matches, then uv's
+/// managed installs. None means leave startup to libpython's own search.
+fn find_python_home(ver: &str) -> Option<String> {
+    let probe = |bin: &str| -> Option<String> {
+        let out = std::process::Command::new(bin)
+            .args([
+                "-c",
+                "import sys; print('%d.%d' % sys.version_info[:2]); print(sys.base_prefix)",
+            ])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&out.stdout);
+        let mut lines = text.lines();
+        (lines.next()? == ver).then(|| lines.next())??.to_string().into()
+    };
+    if let Some(home) = probe(&format!("python{ver}")).or_else(|| probe("python3")) {
+        return Some(home);
+    }
+    // no matching python on PATH; ask uv for a managed one
+    let out = std::process::Command::new("uv")
+        .args(["python", "find", ver])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    probe(&path)
 }
 
 fn errval(py: Python<'_>, e: PyErr) -> ErrVal {
