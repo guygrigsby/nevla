@@ -15,6 +15,11 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
   design in docs/specs/2026-07-09-context-managers-design.md). Deferred
   from it: binding form (`with x := expr`), __exit__ on faults.
 
+- Optional py imports (lmtk, 2026-07-09): eager-fatal `import py` makes
+  optional deps all-or-nothing. importlib.import_module through the bridge
+  already expresses runtime-optional imports; revisit first-class syntax
+  only if that pattern spreads.
+
 ## v2
 
 - Matrix operations: DONE 2026-07-02 (`@`, py-only, spec 7.9/13.2).
