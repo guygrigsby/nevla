@@ -101,7 +101,13 @@ fn new_project(name: &str) -> ExitCode {
 }
 
 fn py_add(package: &str) -> ExitCode {
-    let cwd = std::env::current_dir().expect("cwd");
+    let cwd = match std::env::current_dir() {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("error: cannot read cwd: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     let Some(root) = rikki::project::Project::find(&cwd) else {
         eprintln!("error: no rikki.toml found; run: rikki new <name>");
         return ExitCode::FAILURE;
