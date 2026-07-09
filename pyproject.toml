@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "rikki"
+description = "Interpreted language with Go's discipline and CPython's ecosystem; ships the rikki and tk binaries"
+requires-python = ">=3.10"
+license = "MIT"
+dynamic = ["version"]
+
+[tool.maturin]
+bindings = "bin"
