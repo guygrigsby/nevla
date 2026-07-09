@@ -7,10 +7,14 @@ description = "Interpreted language with Go's discipline and CPython's ecosystem
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-ctrlc = "3.5.2"
 indexmap = "2"
-pyo3 = { version = "0.29.0", features = ["py-clone"] }
 toml = "1.1.2"
+
+# native-only: the py bridge, http, and SIGINT handling have no wasm story;
+# the playground build stubs them (src/bridge_wasm.rs, cfg gates)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ctrlc = "3.5.2"
+pyo3 = { version = "0.29.0", features = ["py-clone"] }
 ureq = "3.3.0"
 
 [[bin]]

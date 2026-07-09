@@ -41,6 +41,7 @@ impl CtxInner {
 
 static SIGINT: OnceLock<Arc<AtomicBool>> = OnceLock::new();
 
+#[cfg(not(target_arch = "wasm32"))]
 fn sigint_flag() -> Arc<AtomicBool> {
     SIGINT
         .get_or_init(|| {
@@ -50,6 +51,14 @@ fn sigint_flag() -> Arc<AtomicBool> {
             let _ = ctrlc::set_handler(move || f.store(true, Ordering::SeqCst));
             flag
         })
+        .clone()
+}
+
+/// No signals in the browser; the flag exists and never fires.
+#[cfg(target_arch = "wasm32")]
+fn sigint_flag() -> Arc<AtomicBool> {
+    SIGINT
+        .get_or_init(|| Arc::new(AtomicBool::new(false)))
         .clone()
 }
 
@@ -63,26 +72,35 @@ fn parent(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn timeout(interp: &Interp, p: &Value, secs: f64) -> Result<Value, Fault> {
+    let (deadline, interrupted) = parent(interp, Some(p))?;
+    // from_secs_f64 panics on inf or seconds past u64::MAX, and
+    // Instant addition can overflow; both are expressible from
+    // user source (1.0 / 0.0 is inf), so both fault.
+    let out_of_range = || interp.fault("ctx.timeout: seconds out of range");
+    let d = Duration::try_from_secs_f64(secs.max(0.0)).map_err(|_| out_of_range())?;
+    let new = Instant::now().checked_add(d).ok_or_else(out_of_range)?;
+    let deadline = Some(deadline.map_or(new, |d| d.min(new)));
+    Ok(Value::Ctx(Arc::new(CtxInner {
+        deadline,
+        interrupted,
+    })))
+}
+
+/// Instant::now() traps on bare wasm; deadlines need a clock.
+#[cfg(target_arch = "wasm32")]
+fn timeout(interp: &Interp, _p: &Value, _secs: f64) -> Result<Value, Fault> {
+    Err(interp.fault("ctx.timeout is not available in this build"))
+}
+
 pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, Fault> {
     let v = match (name, args.as_slice()) {
         ("background", []) => Value::Ctx(Arc::new(CtxInner {
             deadline: None,
             interrupted: None,
         })),
-        ("timeout", [p, Value::Float(secs)]) => {
-            let (deadline, interrupted) = parent(interp, Some(p))?;
-            // from_secs_f64 panics on inf or seconds past u64::MAX, and
-            // Instant addition can overflow; both are expressible from
-            // user source (1.0 / 0.0 is inf), so both fault.
-            let out_of_range = || interp.fault("ctx.timeout: seconds out of range");
-            let d = Duration::try_from_secs_f64(secs.max(0.0)).map_err(|_| out_of_range())?;
-            let new = Instant::now().checked_add(d).ok_or_else(out_of_range)?;
-            let deadline = Some(deadline.map_or(new, |d| d.min(new)));
-            Value::Ctx(Arc::new(CtxInner {
-                deadline,
-                interrupted,
-            }))
-        }
+        ("timeout", [p, Value::Float(secs)]) => timeout(interp, p, *secs)?,
         ("interrupt", [p]) => {
             let (deadline, _) = parent(interp, Some(p))?;
             Value::Ctx(Arc::new(CtxInner {

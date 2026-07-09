@@ -18,6 +18,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # the full gate: py goldens are skipped without RIKKI_TEST_PY
       - run: RIKKI_TEST_PY=1 cargo test
+      # the playground target: the lib must keep building for wasm with the
+      # native-only pieces (py bridge, http, signals) gated out
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo build --lib --target wasm32-unknown-unknown
 
   fuzz:
     runs-on: ubuntu-latest

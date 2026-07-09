@@ -1,4 +1,8 @@
 pub mod ast;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod bridge;
+#[cfg(target_arch = "wasm32")]
+#[path = "bridge_wasm.rs"]
 pub mod bridge;
 pub mod builtins;
 pub mod diag;
@@ -76,6 +80,7 @@ pub fn run_with(path: &Path, args: Vec<String>, stream: bool) -> RunResult {
 /// Run under the panic net: a dedicated big-stack thread (the interpreter's
 /// recursion cap needs more than a default debug-build stack) whose panic
 /// becomes a RuntimeError instead of aborting the process.
+#[cfg(not(target_arch = "wasm32"))]
 fn on_interp_thread(f: impl FnOnce() -> RunResult + Send + 'static) -> RunResult {
     let internal_panic = || RunResult {
         stdout: String::new(),
@@ -92,6 +97,13 @@ fn on_interp_thread(f: impl FnOnce() -> RunResult + Send + 'static) -> RunResult
         };
     };
     handle.join().unwrap_or_else(|_| internal_panic())
+}
+
+/// wasm has no threads and panics trap; run inline and let the browser's
+/// wasm sandbox be the net.
+#[cfg(target_arch = "wasm32")]
+fn on_interp_thread(f: impl FnOnce() -> RunResult + Send + 'static) -> RunResult {
+    f()
 }
 
 /// Print a run's output and map its exit kind to a process exit code.
@@ -191,7 +203,12 @@ fn compile_and(path: &Path, mode: Mode, args: Vec<String>, out: Output) -> RunRe
         }
         // no project: bare interpreter, stdlib python only
     }
-    if let Err(diags) = typecheck::check(&prog) {
+    check_then_run(&prog, mode, args, out)
+}
+
+/// The back half of every entry point: typecheck, then interpret.
+fn check_then_run(prog: &ast::Program, mode: Mode, args: Vec<String>, out: Output) -> RunResult {
+    if let Err(diags) = typecheck::check(prog) {
         let msg = diags
             .iter()
             .map(|d| d.to_string())
@@ -205,7 +222,7 @@ fn compile_and(path: &Path, mode: Mode, args: Vec<String>, out: Output) -> RunRe
             exit: ExitKind::Ok,
         };
     }
-    let mut interp = interp::Interp::new(&prog);
+    let mut interp = interp::Interp::new(prog);
     interp.set_args(args);
     if out == Output::Streamed {
         interp.stream_stdout();
@@ -234,6 +251,30 @@ fn compile_and(path: &Path, mode: Mode, args: Vec<String>, out: Output) -> RunRe
     }
 }
 
+/// Compile and run source directly, no filesystem involved: the playground
+/// entry point. File imports need files and are rejected; stdlib and py
+/// imports follow the build (a build without python reports the error at
+/// program start).
+pub fn run_snippet(src: &str) -> RunResult {
+    let src = src.to_string();
+    on_interp_thread(move || {
+        let prog = match parser::parse(&src) {
+            Ok(p) => p,
+            Err(d) => return compile_err(d.to_string()),
+        };
+        for d in &prog.decls {
+            if let ast::Decl::Import { path, py: false, .. } = d {
+                if path.ends_with(".rk") {
+                    return compile_err(format!(
+                        "import {path:?}: file imports are not available here"
+                    ));
+                }
+            }
+        }
+        check_then_run(&prog, Mode::Run, vec![], Output::Buffered)
+    })
+}
+
 /// PyPI treats `-` and `_` as interchangeable in package names; imports use
 /// the module name. Match declared deps against import names accordingly.
 fn dep_declared(proj: &project::Project, module: &str) -> bool {
@@ -249,6 +290,31 @@ fn dep_declared(proj: &project::Project, module: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn snippet_runs_without_files() {
+        let r = run_snippet("fn main() {\n    print(\"hi\")\n}\n");
+        assert!(matches!(r.exit, ExitKind::Ok), "{:?}", r.exit);
+        assert_eq!(r.stdout, "hi\n");
+    }
+
+    #[test]
+    fn snippet_reports_compile_errors() {
+        let r = run_snippet("fn main() {\n    if 1 {\n        print(\"x\")\n    }\n}\n");
+        let ExitKind::CompileError(m) = r.exit else {
+            panic!("{:?}", r.exit)
+        };
+        assert!(m.contains("condition must be bool"), "{m}");
+    }
+
+    #[test]
+    fn snippet_rejects_file_imports() {
+        let r = run_snippet("import \"util.rk\"\n\nfn main() {\n    print(1)\n}\n");
+        let ExitKind::CompileError(m) = r.exit else {
+            panic!("{:?}", r.exit)
+        };
+        assert!(m.contains("file imports are not available"), "{m}");
+    }
 
     #[test]
     fn dashed_dep_satisfies_underscored_import() {

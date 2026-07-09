@@ -1,12 +1,17 @@
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
+#[cfg(not(target_arch = "wasm32"))]
 use indexmap::IndexMap;
+#[cfg(not(target_arch = "wasm32"))]
 use ureq::Agent;
 
 use crate::ast::TypeExpr;
 use crate::interp::{Fault, Interp};
 use crate::types::Type;
-use crate::value::{ErrVal, MapKey, Value};
+use crate::value::Value;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::value::{ErrVal, MapKey};
 
 /// The struct shapes `import "http"` injects into a program: the single
 /// source consumed by the checker (as `Type`) and the interpreter (as
@@ -69,6 +74,7 @@ fn shapes<T>(ty: impl Fn(&FieldTy) -> T) -> Vec<(String, Vec<(String, T)>)> {
         .collect()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn zero_response() -> Value {
     let mut fields = IndexMap::new();
     fields.insert("status".to_string(), Value::Int(0));
@@ -80,6 +86,7 @@ fn zero_response() -> Value {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn fail(msg: String) -> Value {
     Value::Tuple(vec![
         zero_response(),
@@ -90,6 +97,7 @@ fn fail(msg: String) -> Value {
     ])
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 struct Req {
     method: String,
     url: String,
@@ -97,6 +105,14 @@ struct Req {
     headers: Vec<(String, String)>,
 }
 
+/// Browsers have no sockets to give a synchronous interpreter; the whole
+/// module reports unavailability on wasm.
+#[cfg(target_arch = "wasm32")]
+pub fn call(interp: &mut Interp, name: &str, _args: Vec<Value>) -> Result<Value, Fault> {
+    Err(interp.fault(format!("http.{name} is not available in this build")))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, Fault> {
     if name == "stream" {
         return stream(interp, args);
@@ -217,6 +233,7 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
 /// arrives (SSE-friendly). The returned Response still carries the
 /// accumulated body: a pre-ADR-0010 apology (closures could not accumulate
 /// then), kept for compatibility.
+#[cfg(not(target_arch = "wasm32"))]
 fn stream(interp: &mut Interp, args: Vec<Value>) -> Result<Value, Fault> {
     let [Value::Ctx(ctx), Value::Str(url), Value::Str(body), handler @ Value::Fn(_)] =
         args.as_slice()
