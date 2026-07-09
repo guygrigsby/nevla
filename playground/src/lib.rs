@@ -28,6 +28,30 @@ pub fn run(source: &str) -> JsValue {
     serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
 }
 
+#[derive(Serialize)]
+struct FmtOutput {
+    ok: bool,
+    code: String,
+    error: String,
+}
+
+#[wasm_bindgen]
+pub fn fmt(source: &str) -> JsValue {
+    let out = match rikki::format::fmt_source(source) {
+        Ok(code) => FmtOutput {
+            ok: true,
+            code,
+            error: String::new(),
+        },
+        Err(d) => FmtOutput {
+            ok: false,
+            code: String::new(),
+            error: d.to_string(),
+        },
+    };
+    serde_wasm_bindgen::to_value(&out).unwrap_or(JsValue::NULL)
+}
+
 #[wasm_bindgen]
 pub fn version() -> String {
     // the interpreter crate's version, not this shim's

@@ -1,4 +1,4 @@
-import init, { run, version } from "./pkg/rikki_playground.js";
+import init, { run, fmt, version } from "./pkg/rikki_playground.js";
 
 const EXAMPLES = {
   "hello world": `fn main() {
@@ -144,6 +144,26 @@ function fromHash() {
 }
 
 document.getElementById("run").addEventListener("click", execute);
+document.getElementById("format").addEventListener("click", () => {
+  const r = fmt(editor.value);
+  if (r.ok) {
+    editor.value = r.code;
+    errLines = new Set();
+    renderGutter();
+    status.textContent = "formatted";
+    status.classList.remove("error");
+  } else {
+    status.textContent = "compile error";
+    status.classList.add("error");
+    output.classList.add("error");
+    output.textContent = r.error;
+    errLines = new Set();
+    for (const m of r.error.matchAll(/^(\d+):\d+:/gm)) {
+      errLines.add(Number(m[1]));
+    }
+    renderGutter();
+  }
+});
 document.getElementById("share").addEventListener("click", share);
 examples.addEventListener("change", () => {
   editor.value = EXAMPLES[examples.value];
