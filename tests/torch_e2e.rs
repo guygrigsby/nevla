@@ -43,6 +43,37 @@ fn main() (error?) {
 }
 "#;
 
+// manual attention through the `@` operator vs the fused kernel; on CPU
+// SDPA is the math backend, so this pins rikki's matmul/softmax path
+// against torch's reference, not flash-vs-not (that is torch's lane)
+const ATTN_RK: &str = r#"import "math"
+import py "torch"
+
+fn attention(q py, k py, v py) (py, error?) {
+    scale := math.sqrt(8.0)
+    w := check torch.softmax(q @ k.transpose(-2, -1) / scale, dim: -1)
+    out := check (w @ v)
+    return out, none
+}
+
+fn main() (error?) {
+    check torch.manual_seed(0)
+    q := check torch.randn([2, 4, 8])
+    k := check torch.randn([2, 4, 8])
+    v := check torch.randn([2, 4, 8])
+    manual, err := attention(q, k, v)
+    if err != none {
+        return err
+    }
+    fused := check torch.nn.functional.scaled_dot_product_attention(q, k, v)
+    same := check bool(torch.allclose(manual, fused, atol: 0.000001))
+    if same {
+        print("attention agrees")
+    }
+    return none
+}
+"#;
+
 #[test]
 fn tiny_cpu_pretrain() {
     if std::env::var("RIKKI_TEST_TORCH").is_err() {
@@ -84,4 +115,19 @@ fn tiny_cpu_pretrain() {
     assert!(out.status.success(), "run failed:\n{stdout}\n{stderr}");
     assert!(stdout.contains("trained"), "loss did not collapse:\n{stdout}");
     assert!(stdout.contains("converged"), "w missed 3.0:\n{stdout}");
+
+    // same provisioned project, second program: attention both ways
+    std::fs::write(proj.join("src/attn.rk"), ATTN_RK).unwrap();
+    let out = Command::new(bin)
+        .args(["run", "src/attn.rk"])
+        .current_dir(&proj)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "attn failed:\n{stdout}\n{stderr}");
+    assert!(
+        stdout.contains("attention agrees"),
+        "manual @ path diverged from SDPA:\n{stdout}"
+    );
 }
