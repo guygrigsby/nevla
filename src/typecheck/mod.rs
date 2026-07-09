@@ -74,7 +74,9 @@ impl Checker {
         for d in &prog.decls {
             if let Decl::Import { path, py, .. } = d {
                 if *py {
-                    self.imports.insert(path.clone(), ImportKind::Py);
+                    // a dotted import binds its top-level segment (13.1)
+                    let top = path.split('.').next().unwrap_or(path);
+                    self.imports.insert(top.to_string(), ImportKind::Py);
                 } else if STD_MODULES.contains(&path.as_str()) {
                     self.imports
                         .insert(path.clone(), ImportKind::Std(path.clone()));

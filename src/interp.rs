@@ -177,9 +177,15 @@ impl<'p> Interp<'p> {
     /// Run fn main. Returns main's error value if it returned one.
     pub fn run_main(&mut self) -> Result<Option<ErrVal>, Fault> {
         for m in self.py_imports.clone() {
-            match crate::bridge::import(&m) {
+            // import the full dotted path (loading the submodule), then bind
+            // the top segment, Python's own semantics (spec 13.1)
+            if let Err(e) = crate::bridge::import(&m) {
+                return Err(self.fault(format!("import py \"{m}\": {}", e.msg)));
+            }
+            let top = m.split('.').next().unwrap_or(&m).to_string();
+            match crate::bridge::import(&top) {
                 Ok(h) => {
-                    self.globals.insert(m, Value::Py(h));
+                    self.globals.insert(top, Value::Py(h));
                 }
                 Err(e) => return Err(self.fault(format!("import py \"{m}\": {}", e.msg))),
             }

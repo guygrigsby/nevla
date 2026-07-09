@@ -1582,7 +1582,10 @@ statement (all statements with no error slot), where an exception faults
 
 `import py "modname"` binds the named Python module as a value of type `py`.
 Module resolution follows Python's own import rules in the embedded
-interpreter; a dotted path imports the submodule. If the import fails at
+interpreter. A dotted path imports the submodule and, as in Python, binds
+the top-level segment: `import py "os.path"` loads `os.path` and binds
+`os`, so `os.path.join(...)` is an ordinary chain. Several imports sharing
+a top segment are one binding. If an import fails at
 program start (for example the module does not exist), the program terminates
 with a runtime error before `main` runs, carrying the Python exception text.
 

@@ -1,0 +1,9 @@
+import py "os.path"
+
+fn main() (error?) {
+    p := check os.path.join("a", "b")
+    print(check str(p))
+    d := check os.path.dirname("x/y/z.txt")
+    print(check str(d))
+    return none
+}
