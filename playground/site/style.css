@@ -76,7 +76,31 @@ main {
   main { grid-template-columns: 1fr; grid-template-rows: 3fr 2fr; }
 }
 
+#editor-wrap {
+  display: flex;
+  background: var(--panel);
+  min-height: 0;
+  min-width: 0;
+}
+#gutter {
+  padding: 1rem 0.25rem 1rem 0;
+  min-width: 2.6rem;
+  overflow: hidden;
+  text-align: right;
+  color: var(--muted);
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  user-select: none;
+  font: 14px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+#gutter div { padding-right: 0.55rem; }
+#gutter .err-line {
+  color: var(--error);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+}
 #editor {
+  flex: 1;
   border: 0;
   resize: none;
   padding: 1rem;
@@ -84,6 +108,8 @@ main {
   color: var(--text);
   font: 14px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   tab-size: 4;
+  white-space: pre;
+  overflow: auto;
 }
 #editor:focus { outline: none; }
 

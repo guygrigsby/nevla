@@ -34,7 +34,10 @@ visual priority.
 - Frontend-only WASM on GitHub Pages; no backend, ever. Sharing encodes
   the program into the URL fragment.
 - A plain textarea editor until it hurts; no editor framework, no CDN
-  dependencies. The page is fully self-contained.
+  dependencies. The page is fully self-contained. It hurt once already:
+  compile errors were unfindable, so the textarea gained a synced line
+  gutter that highlights diagnostic lines in the error color (wrap off,
+  so gutter and text can never drift).
 - The python bridge is honestly absent: the py example runs and shows the
   real "python is not available in this build" error rather than hiding
   the boundary.

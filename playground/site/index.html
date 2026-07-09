@@ -20,7 +20,10 @@
   </nav>
 </header>
 <main>
-  <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="rikki source"></textarea>
+  <div id="editor-wrap">
+    <div id="gutter" aria-hidden="true"></div>
+    <textarea id="editor" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="rikki source"></textarea>
+  </div>
   <div id="output-pane">
     <div id="status"></div>
     <pre id="output"></pre>

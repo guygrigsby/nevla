@@ -67,9 +67,24 @@ fn main() (error?) {
 };
 
 const editor = document.getElementById("editor");
+const gutter = document.getElementById("gutter");
 const output = document.getElementById("output");
 const status = document.getElementById("status");
 const examples = document.getElementById("examples");
+
+let errLines = new Set();
+
+function renderGutter() {
+  const n = editor.value.split("\n").length;
+  gutter.replaceChildren();
+  for (let i = 1; i <= n; i++) {
+    const d = document.createElement("div");
+    d.textContent = i;
+    if (errLines.has(i)) d.className = "err-line";
+    gutter.appendChild(d);
+  }
+  gutter.scrollTop = editor.scrollTop;
+}
 
 for (const name of Object.keys(EXAMPLES)) {
   const o = document.createElement("option");
@@ -80,6 +95,7 @@ for (const name of Object.keys(EXAMPLES)) {
 
 function execute() {
   const r = run(editor.value);
+  errLines = new Set();
   if (r.status === "ok") {
     status.textContent = "ok";
     status.classList.remove("error");
@@ -90,7 +106,12 @@ function execute() {
     status.classList.add("error");
     output.classList.add("error");
     output.textContent = (r.stdout.length ? r.stdout + "\n" : "") + r.error;
+    // diagnostics lead with line:col; light the gutter up
+    for (const m of r.error.matchAll(/^(\d+):\d+:/gm)) {
+      errLines.add(Number(m[1]));
+    }
   }
+  renderGutter();
 }
 
 function share() {
@@ -122,6 +143,13 @@ examples.addEventListener("change", () => {
   editor.value = EXAMPLES[examples.value];
   history.replaceState(null, "", location.pathname);
   execute();
+});
+editor.addEventListener("input", () => {
+  errLines = new Set();
+  renderGutter();
+});
+editor.addEventListener("scroll", () => {
+  gutter.scrollTop = editor.scrollTop;
 });
 editor.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
