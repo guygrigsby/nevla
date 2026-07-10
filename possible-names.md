@@ -21,3 +21,7 @@ sarcosynth - flesh synth
 vein
 
 mongoose **CHOSEN then RENAMED**: the language (2026-07-01); collided with the mg editor via its runner, whole thing renamed to rikki + tk (Rikki-Tikki-Tavi) on 2026-07-02. See docs/adr/0007.
+
+nevla **CHOSEN**: the language (2026-07-10); Hindi for mongoose. rikki/tk
+renamed away over the Kipling story's colonial subtext (ADR 0014). Runner
+nv, extension .nv, same purple mongoose.
