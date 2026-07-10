@@ -36,7 +36,7 @@ fn main() (error?) {
 
 Split like uv and python. `nevla` does setup: `nevla new`, `nevla py add torch`, `nevla check`, `nevla run`. `nv` runs code: `nv train.nv`, and bare `nv` is the repl. Python deps live in the project manifest and every `import py` is validated against it at compile time, so a missing dep is a compile error, not a stack trace twenty minutes into a training run.
 
-Try it without installing anything: [the playground](https://nevla.aeryx.ai/) runs the interpreter in your browser (the py bridge needs a real CPython, so that part is native-only). [The nevla book](https://nevla.aeryx.ai/book/) is the guide.
+Try it without installing anything: [the playground](https://nevla.dev/play/) runs the interpreter in your browser (the py bridge needs a real CPython, so that part is native-only). [The nevla book](https://nevla.dev/doc/) is the guide.
 
 ## Getting started
 

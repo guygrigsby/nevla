@@ -5,7 +5,7 @@
   let mod = null;
   async function ensure() {
     if (mod) return mod;
-    const m = await import("/pkg/nevla_playground.js");
+    const m = await import("/play/pkg/nevla_playground.js");
     await m.default();
     mod = m;
     return mod;

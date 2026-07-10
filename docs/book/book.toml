@@ -6,7 +6,7 @@ src = "src"
 
 [output.html]
 git-repository-url = "https://github.com/guygrigsby/nevla"
-site-url = "/book/"
+site-url = "/doc/"
 additional-css = ["theme/nevla.css"]
 additional-js = ["theme/runnable.js"]
 preferred-dark-theme = "navy"

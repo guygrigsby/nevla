@@ -31,7 +31,7 @@ fn linkify(content str) (str, error?) {
             for enc.ends_with("=") {
                 enc = enc.trim_suffix("=")
             }
-            out = out + "\n\n[**▸ run it in the playground**](https://nevla.aeryx.ai/#" + enc + ")\n"
+            out = out + "\n\n[**▸ run it in the playground**](https://nevla.dev/play/#" + enc + ")\n"
         }
     }
     return out + rest, none

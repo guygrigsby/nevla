@@ -28,25 +28,31 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack,mdbook
-      - name: build the playground
+      - name: build the site
         run: |
-          # the book's preprocessor and reference generator are nevla
-          # programs; build the runner first
+          # nevla.dev, go.dev-shaped: / is a landing page, /play the
+          # playground, /doc the book, /ref/spec the rendered spec.
+          # The book's preprocessor and reference generator are nevla
+          # programs; build the runner first.
           cargo build --bin nv
+          mkdir -p dist/play/pkg
+          cp site/index.html dist/
+          cp art/logo.png dist/
           cd playground
           wasm-pack build --target web --release
-          mkdir -p ../dist/pkg
-          cp site/index.html site/style.css site/main.js ../dist/
-          cp pkg/nevla_playground.js pkg/nevla_playground_bg.wasm ../dist/pkg/
-          cp ../art/logo.png ../dist/
-          (cd .. && ./target/debug/nv docs/book/gen-reference.nv)
-          mdbook build ../docs/book -d "$(pwd)/../dist/book"
+          cp site/index.html site/style.css site/main.js ../dist/play/
+          cp pkg/nevla_playground.js pkg/nevla_playground_bg.wasm ../dist/play/pkg/
+          cp ../art/logo.png ../dist/play/
+          cd ..
+          ./target/debug/nv docs/book/gen-reference.nv
+          mdbook build docs/book -d "$(pwd)/dist/doc"
+          mdbook build docs/ref -d "$(pwd)/dist/ref/spec"
           # cache-bust every asset chain with the commit: Pages caches for
           # ten minutes and a fresh html over stale css shears the layout
           v="${GITHUB_SHA::8}"
-          sed -i "s|style.css|style.css?v=$v|; s|main.js|main.js?v=$v|" ../dist/index.html
-          sed -i "s|./pkg/nevla_playground.js|./pkg/nevla_playground.js?v=$v|" ../dist/main.js
-          sed -i "s|nevla_playground_bg.wasm|nevla_playground_bg.wasm?v=$v|" ../dist/pkg/nevla_playground.js
+          sed -i "s|style.css|style.css?v=$v|; s|main.js|main.js?v=$v|" dist/play/index.html
+          sed -i "s|./pkg/nevla_playground.js|./pkg/nevla_playground.js?v=$v|" dist/play/main.js
+          sed -i "s|nevla_playground_bg.wasm|nevla_playground_bg.wasm?v=$v|" dist/play/pkg/nevla_playground.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nevla</title>
+<meta name="description" content="nevla: Go's discipline, CPython's ecosystem. A statically checked language for ML work that runs real Python libraries.">
+<link rel="icon" href="logo.png">
+<style>
+  :root {
+    --brand: #C86FB9;
+    --brand-deep: #a94f9a;
+    --bg: #faf7f9;
+    --panel: #ffffff;
+    --fg: #2a2028;
+    --muted: #6b5f68;
+    --border: #e8dde5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1418;
+      --panel: #241c22;
+      --fg: #ece5ea;
+      --muted: #a998a4;
+      --border: #3a2e36;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 3rem 1.25rem 2rem; width: 100%; }
+  .hero { display: flex; align-items: center; gap: 1.5rem; }
+  .hero img { width: 140px; height: auto; }
+  .hero h1 { font-size: 2.6rem; line-height: 1.1; }
+  .hero p { color: var(--muted); font-size: 1.15rem; margin-top: 0.4rem; }
+  nav.links { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 2rem 0; }
+  nav.links a {
+    display: inline-block;
+    padding: 0.55rem 1.2rem;
+    border-radius: 7px;
+    border: 1px solid var(--brand);
+    color: var(--brand-deep);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  @media (prefers-color-scheme: dark) { nav.links a { color: var(--brand); } }
+  nav.links a.primary { background: var(--brand); color: #fff; }
+  nav.links a.primary:hover { background: var(--brand-deep); border-color: var(--brand-deep); }
+  nav.links a:hover { border-color: var(--brand-deep); }
+  pre {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    font: 0.9rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .comment { color: var(--muted); }
+  .kw { color: var(--brand-deep); font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .kw { color: var(--brand); } }
+  section.pitch { margin-top: 2rem; color: var(--fg); }
+  section.pitch p { margin-bottom: 0.8rem; }
+  footer {
+    margin-top: auto;
+    padding: 1.2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  footer a { color: inherit; }
+  @media (max-width: 540px) {
+    .hero { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="hero">
+    <img src="logo.png" alt="Nevli the mongoose">
+    <div>
+      <h1>nevla</h1>
+      <p>Go's discipline, CPython's ecosystem.</p>
+    </div>
+  </div>
+
+  <nav class="links">
+    <a class="primary" href="/doc/">Get started</a>
+    <a href="/play/">Playground</a>
+    <a href="/ref/spec/">Language spec</a>
+    <a href="https://github.com/guygrigsby/nevla">GitHub</a>
+  </nav>
+
+<pre><code><span class="kw">import py</span> "torch"
+
+<span class="kw">fn</span> main() (error?) {
+    w := <span class="kw">check</span> torch.randn([784, 10], requires_grad: true)
+    x := <span class="kw">check</span> torch.randn([32, 784])
+    logits := <span class="kw">check</span> (x @ w)
+    print(<span class="kw">check</span> str(logits.shape))
+    <span class="kw">return</span> none
+}</code></pre>
+
+  <section class="pitch">
+    <p>That is real torch, one import away, with Python's exceptions
+    arriving as typed error values instead of tracebacks. The whole
+    program is checked before any of it runs; a checked program cannot
+    crash the process.</p>
+    <p>Errors are values and dropping one is a compile error. There is
+    no nil. Dependencies are declared or the program does not compile.
+    The twenty-minute crash dies at <code>nevla check</code>, in
+    milliseconds, or not at all.</p>
+  </section>
+</main>
+<footer>
+  code <a href="https://github.com/guygrigsby/nevla/blob/main/LICENSE">MIT</a> ·
+  mascot <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> ·
+  <a href="/doc/mascot.html">Nevli the mongoose</a>
+</footer>
+</body>
+</html>

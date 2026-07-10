@@ -78,7 +78,7 @@ compromise.
 
 ## Getting started
 
-Try it in [the playground](https://nevla.aeryx.ai/) without installing
+Try it in [the playground](https://nevla.dev/play/) without installing
 anything, or install it:
 
 ```sh

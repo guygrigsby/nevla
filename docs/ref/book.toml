@@ -1,0 +1,11 @@
+[book]
+title = "The nevla language specification"
+authors = ["Guy J Grigsby"]
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/guygrigsby/nevla"
+site-url = "/ref/spec/"
+additional-css = ["../book/theme/nevla.css"]
+preferred-dark-theme = "navy"
