@@ -71,6 +71,39 @@ its error message carries both values; when it doesn't fit, build the
 error yourself — `return error.new(...)` is always available, and a
 custom helper is just a function returning `error?`.
 
+## Table tests
+
+Go's table-driven idiom is a stance, not a framework feature: a table is
+a list of structs and the runner is a `for` loop, so rikki has table
+tests by construction:
+
+```rikki
+struct Case {
+    In int
+    Want int
+}
+
+fn TestDouble() (error?) {
+    cases := [
+        Case{In: 1, Want: 2},
+        Case{In: 0, Want: 0},
+        Case{In: -3, Want: -6},
+    ]
+    for _, c := range cases {
+        err := test.eq(util.double(c.In), c.Want)
+        if err != none {
+            return error.wrap(err, sprintf("double(%v)", c.In))
+        }
+    }
+    return none
+}
+```
+
+The `error.wrap` names the failing case in the report. Tables are also
+exactly the workload that will eventually justify the two deferred
+features below: `test.run` for named cases, soft failures for reporting
+every bad row instead of the first.
+
 ## Failure locations
 
 An error value records its origin: the file and line where `error.new`
