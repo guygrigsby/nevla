@@ -43,6 +43,41 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
   spec 16.3; design in docs/specs/2026-07-09-exported-visibility-design.md).
   Prerequisite for packages below.
 
+## Docs
+
+New features are doc-first (the testing chapter was rikki test's design
+doc; that's the pattern). This is the backlog of chapters the existing
+language has already earned, ordered by user pain. Every chapter's
+examples are compile-gated (tests/book.rs) and complete programs get
+playground links automatically.
+
+- The py bridge: the most alien surface and the biggest gap. Chains and
+  the consumption rules, conversions both directions (the 13.5 tables in
+  prose), kwargs, `@`, iteration, py assignment, `with`, `py(x)`, dotted
+  imports, the manifest rule. One chapter, example-heavy.
+- Errors in depth: check's exact semantics, wrap and cause chains,
+  origins, recovery patterns, faults vs errors and why faults are
+  uncatchable, the don't-blanket-check guidance with worked examples.
+- Projects and dependencies: rikki.toml, py add and --module, the lock
+  and venv lifecycle (fingerprints, auto-relock, rebuild-on-change),
+  what sys.executable means inside a run.
+- Types and the copy model: value vs reference kinds, clone, zero
+  values, equality and contains, options and narrowing in full
+  (invalidation, terminal narrowing).
+- Structs, modules, and visibility: declarations, literals, file
+  imports and namespacing, the capitalization rule, _test pairing.
+- Tooling: fmt and the one true style, check, the repl, the nvim
+  plugin, the agent story (AGENTS.md, the check-on-edit hook).
+- Builtins and stdlib guide: printf verbs, container and string
+  methods, math, file, ctx cancellation patterns, http including
+  stream.
+- Control flow: the three for forms, if and narrowing, break/continue,
+  with.
+- Design: everything-is-data, break-early, Go as the taste reference; a
+  reader's digest of the ADRs.
+- Gotchas / FAQ: the primer's list expanded (append is pure, map reads
+  are optional, int/float don't mix, py comparisons yield py, ...).
+
 ## v2
 
 - Matrix operations: DONE 2026-07-02 (`@`, py-only, spec 7.9/13.2).
