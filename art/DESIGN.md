@@ -17,12 +17,25 @@ full account). Same artwork: the animal was never the problem.
 
 ## Color
 
-- Brand: `#C86FB9` (decided 2026-07-09), the mascot's purple. Use it for
-  primary actions, links, focus rings, and accents; never for body text.
-- Hover/active darkens the brand: `#a94f9a`.
-- Dark surfaces are plum-tinted, not gray: background `#1a1418`, panels
-  `#241c22`, text `#ece5ea`.
-- Light surfaces: background `#faf7f9`, panels `#ffffff`, text `#2a2028`.
+Revised 2026-07-10: lighter overall, and a brand-tinted band across the
+top of every page (go.dev-style). White text on `#c86fb9` was 3.3:1 and
+failed AA on the primary buttons, so filled controls sit on the deep
+purple instead; the bright purple exists because the deep one fails on
+dark grounds. `tests/brand.rs` gates every hex on a site surface against
+this list.
+
+- Brand: `#c86fb9` (decided 2026-07-09), the mascot's purple. Use it for
+  borders, focus rings, and accents; never for body text and never as a
+  ground for white text (3.3:1, fails AA).
+- Filled controls (primary buttons, run buttons): ground `#a94f9a`
+  (4.9:1 with white), hover/active `#8d3f81`.
+- Links and keywords: `#a94f9a` on light, `#d98fcd` on dark.
+- Band (page-top wash): `#f6e7f2` light, `#382b34` dark.
+- Light surfaces: background `#ffffff`, panels `#fbf7fa`, text `#2a2028`,
+  muted `#6b5f68`, borders `#eadfe7`.
+- Dark surfaces are plum-tinted, not gray: background `#231c21`, panels
+  `#2e242b`, text `#ece5ea`, muted `#b1a1ac`, borders `#453842`.
+- Search marks (mdBook): `#f3d9ee` light, `#5c3355` dark.
 - Errors: `#d4526e`, one color for compile and runtime; the label carries
   the distinction.
 - Both themes ship; `prefers-color-scheme` decides.

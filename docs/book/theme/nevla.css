@@ -1,32 +1,48 @@
 /* nevla brand for mdBook (palette: art/DESIGN.md) */
 :root {
-    --nevla: #C86FB9;
+    --nevla: #c86fb9;
     --nevla-deep: #a94f9a;
+    --nevla-deeper: #8d3f81;
 }
 
 .light,
 .rust {
+    --nevla-band: #f6e7f2;
     --links: #a94f9a;
     --sidebar-active: #a94f9a;
+    --sidebar-header-border-color: #a94f9a;
     --search-mark-bg: #f3d9ee;
-    --bg: #faf7f9;
-    --sidebar-bg: #f2ebf0;
+    --bg: #ffffff;
+    --sidebar-bg: #fbf7fa;
 }
 
 .navy,
 .coal,
 .ayu {
-    --links: #C86FB9;
-    --sidebar-active: #C86FB9;
+    --nevla-band: #382b34;
+    --links: #d98fcd;
+    --sidebar-active: #d98fcd;
+    --sidebar-header-border-color: #c86fb9;
     --search-mark-bg: #5c3355;
-    --bg: #1a1418;
-    --content-bg: #1a1418;
-    --sidebar-bg: #241c22;
+    --bg: #231c21;
+    --content-bg: #231c21;
+    --sidebar-bg: #2e242b;
     --fg: #ece5ea;
 }
 
-#menu-bar {
+/* the sticky/hover rules in mdBook's chrome.css re-set the background,
+   so every variant needs covering */
+#mdbook-menu-bar,
+#mdbook-menu-bar.sticky,
+#mdbook-menu-bar:hover,
+html.sidebar-visible #mdbook-menu-bar {
+    background: var(--nevla-band);
     border-bottom: 2px solid var(--nevla);
+}
+
+/* a sidebar that hits its end must not scroll the page under the cursor */
+.sidebar .sidebar-scrollbox {
+    overscroll-behavior: contain;
 }
 
 /* inline runners (runnable.js) */
@@ -39,12 +55,12 @@ button.nevla-run {
     font: 600 0.75rem system-ui, sans-serif;
     padding: 0.2rem 0.7rem;
     border-radius: 5px;
-    border: 1px solid var(--nevla);
-    background: var(--nevla);
+    border: 1px solid var(--nevla-deep);
+    background: var(--nevla-deep);
     color: #fff;
     cursor: pointer;
 }
-button.nevla-run:hover { background: var(--nevla-deep); }
+button.nevla-run:hover { background: var(--nevla-deeper); }
 pre.nevla-out {
     border-left: 3px solid var(--nevla);
     padding: 0.5rem 0.9rem;
@@ -52,8 +68,3 @@ pre.nevla-out {
     white-space: pre-wrap;
 }
 pre.nevla-out.err { border-left-color: #d4526e; color: #d4526e; }
-
-/* a sidebar that hits its end must not scroll the page under the cursor */
-.sidebar .sidebar-scrollbox {
-    overscroll-behavior: contain;
-}
