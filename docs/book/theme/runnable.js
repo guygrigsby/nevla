@@ -1,11 +1,11 @@
-// Every complete rikki example gets a Run button that executes it right
+// Every complete nevla example gets a Run button that executes it right
 // on the page, go.dev style, via the playground's wasm module (served
 // from /pkg/ on the same origin). The share link stays for editing.
 (function () {
   let mod = null;
   async function ensure() {
     if (mod) return mod;
-    const m = await import("/pkg/rikki_playground.js");
+    const m = await import("/pkg/nevla_playground.js");
     await m.default();
     mod = m;
     return mod;
@@ -15,10 +15,10 @@
     const pre = code.closest("pre");
     if (!pre) return;
     const btn = document.createElement("button");
-    btn.className = "rikki-run";
+    btn.className = "nevla-run";
     btn.textContent = "Run";
     const out = document.createElement("pre");
-    out.className = "rikki-out";
+    out.className = "nevla-out";
     out.style.display = "none";
     pre.insertAdjacentElement("afterend", out);
     pre.appendChild(btn);
@@ -47,7 +47,7 @@
     });
   }
 
-  for (const code of document.querySelectorAll("code.language-rikki")) {
+  for (const code of document.querySelectorAll("code.language-nevla")) {
     if (code.textContent.includes("fn main")) {
       attach(code);
     }

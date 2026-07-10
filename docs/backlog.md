@@ -6,17 +6,17 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
 
 - `bytes` type. Unblocks binary file and http bodies. Touches literals,
   indexing, conversions.
-- `rikki fmt`: DONE 2026-07-09 (design:
+- `nevla fmt`: DONE 2026-07-09 (design:
   docs/specs/2026-07-09-fmt-design.md). Corpus-proven lossless (AST and
-  comments preserved, idempotent over every golden); `rikki fmt --check`
+  comments preserved, idempotent over every golden); `nevla fmt --check`
   for gates; Format button in the playground.
-- `rikki test`: DONE 2026-07-09 (design: the book's testing chapter,
+- `nevla test`: DONE 2026-07-09 (design: the book's testing chapter,
   spec 15.6/17.7). Tests are fallible functions; error origins landed
   with it (spec 5.7). Deferred with re-entry paths: soft failures,
   test.run subtests, test.tmpdir, --json output.
-- Version pinning, rikki half: DONE 2026-07-09 (spec 17.4 area; rikki
-  new stamps `rikki = "x.y.z"`, mismatch warns, never blocks). Still
-  open: `rikki py add` recording the resolved version instead of "*" —
+- Version pinning, nevla half: DONE 2026-07-09 (spec 17.4 area; nevla
+  new stamps `nevla = "x.y.z"`, mismatch warns, never blocks). Still
+  open: `nevla py add` recording the resolved version instead of "*" —
   needs an upgrade-path decision first (does re-adding refresh the pin?).
 - Source snippets in diagnostics (decided 2026-07-09): show the offending
   source line with a caret under file:line:col. Humans and the playground
@@ -49,7 +49,7 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
 
 ## Docs
 
-New features are doc-first (the testing chapter was rikki test's design
+New features are doc-first (the testing chapter was nevla test's design
 doc; that's the pattern). This is the backlog of chapters the existing
 language has already earned, ordered by user pain. Every chapter's
 examples are compile-gated (tests/book.rs) and complete programs get
@@ -62,7 +62,7 @@ playground links automatically.
 - Errors in depth: check's exact semantics, wrap and cause chains,
   origins, recovery patterns, faults vs errors and why faults are
   uncatchable, the don't-blanket-check guidance with worked examples.
-- Projects and dependencies: rikki.toml, py add and --module, the lock
+- Projects and dependencies: nevla.toml, py add and --module, the lock
   and venv lifecycle (fingerprints, auto-relock, rebuild-on-change),
   what sys.executable means inside a run.
 - Types and the copy model: value vs reference kinds, clone, zero
@@ -85,7 +85,7 @@ playground links automatically.
   and Standard library chapters are generated from spec ch 14/15 at
   build time. Stage two is sigs.rs becoming a declarative table feeding
   both the checker and the docs (everything-is-data applied to the
-  stdlib surface). Stage three is `rikki doc`: doc comments in .rk
+  stdlib surface). Stage three is `nevla doc`: doc comments in .nv
   source generating package docs, the true godoc analog, when packages
   exist.
 
@@ -99,16 +99,16 @@ playground links automatically.
   mismatch in signatures. Brands erode through dynamic ops (`w @ x` is py
   again); re-assert at function boundaries. Zero copies, reference semantics
   like py. Composes with the `@` sugar above.
-- Packages: export and depend on rikki code across projects (2026-07-09).
+- Packages: export and depend on nevla code across projects (2026-07-09).
   The Go shape throughout, it is already muscle memory: capitalization
   visibility (v1.1 item above, the breaking prerequisite), git-based deps
   over any registry (`[deps] torchkit = { git = "...", rev = "..." }` in
-  rikki.toml, vendored under .rikki/, imported by name), a package is a
-  directory of .rk files without a main. The genuinely novel piece is
+  nevla.toml, vendored under .nevla/, imported by name), a package is a
+  directory of .nv files without a main. The genuinely novel piece is
   transitive py-deps: a package's `[py-deps]` merge into the consumer's
   requirement set and one uv resolve covers the union. Natural first
   artifact: typed facades over python packages (the lmtk tracker/loader
-  wrappers). Trigger: the first time a second project wants lmtk's rikki
+  wrappers). Trigger: the first time a second project wants lmtk's nevla
   code. Explicitly NOT a stability commitment: packages do not slow
   language change pre-adoption.
 - Concurrency: SPEC SOON (escalated 2026-07-09), implement later. A

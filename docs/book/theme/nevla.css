@@ -1,7 +1,7 @@
-/* rikki brand for mdBook (palette: art/DESIGN.md) */
+/* nevla brand for mdBook (palette: art/DESIGN.md) */
 :root {
-    --rikki: #C86FB9;
-    --rikki-deep: #a94f9a;
+    --nevla: #C86FB9;
+    --nevla-deep: #a94f9a;
 }
 
 .light,
@@ -26,12 +26,12 @@
 }
 
 #menu-bar {
-    border-bottom: 2px solid var(--rikki);
+    border-bottom: 2px solid var(--nevla);
 }
 
 /* inline runners (runnable.js) */
 pre { position: relative; }
-button.rikki-run {
+button.nevla-run {
     position: absolute;
     top: 0.4rem;
     right: 3rem; /* clear of mdBook's hover clipboard button (right: 0, ~2.7rem wide) */
@@ -39,16 +39,16 @@ button.rikki-run {
     font: 600 0.75rem system-ui, sans-serif;
     padding: 0.2rem 0.7rem;
     border-radius: 5px;
-    border: 1px solid var(--rikki);
-    background: var(--rikki);
+    border: 1px solid var(--nevla);
+    background: var(--nevla);
     color: #fff;
     cursor: pointer;
 }
-button.rikki-run:hover { background: var(--rikki-deep); }
-pre.rikki-out {
-    border-left: 3px solid var(--rikki);
+button.nevla-run:hover { background: var(--nevla-deep); }
+pre.nevla-out {
+    border-left: 3px solid var(--nevla);
     padding: 0.5rem 0.9rem;
     font-size: 0.85em;
     white-space: pre-wrap;
 }
-pre.rikki-out.err { border-left-color: #d4526e; color: #d4526e; }
+pre.nevla-out.err { border-left-color: #d4526e; color: #d4526e; }

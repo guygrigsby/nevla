@@ -464,7 +464,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rikki"
+name = "nevla"
 version = "0.1.12"
 dependencies = [
  "clap",
@@ -477,10 +477,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rikki-playground"
+name = "nevla-playground"
 version = "0.0.0"
 dependencies = [
- "rikki",
+ "nevla",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",

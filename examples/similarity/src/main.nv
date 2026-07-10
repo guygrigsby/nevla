@@ -1,5 +1,5 @@
 // Semantic search: embed a corpus, rank it against a query.
-// First real rikki program.
+// First real nevla program.
 import py "sentence_transformers"
 
 struct Hit {
@@ -27,7 +27,7 @@ fn main() (error?) {
         "The kernel panicked during the ARM64 boot sequence.",
         "She trains transformers on a single consumer GPU.",
         "Fresh bread needs only flour, water, salt, and time.",
-        "Rikki-Tikki-Tavi kept the bungalow safe from cobras.",
+        "Nevla-Tikki-Tavi kept the bungalow safe from cobras.",
     ]
     query := "an animal that kills cobras"
     hits := check rank(query, corpus)

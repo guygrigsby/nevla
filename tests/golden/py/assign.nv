@@ -3,8 +3,8 @@ import py "builtins"
 
 fn main() (error?) {
     // setattr on a module object, read back through the chain
-    json.rikki_probe = 42
-    n := check int(json.rikki_probe)
+    json.nevla_probe = 42
+    n := check int(json.nevla_probe)
     print(n)
     // setitem on a dict, read back
     d := check builtins.dict()

@@ -33,12 +33,12 @@ impl Checker {
     fn current_module(&self) -> Option<&str> {
         self.current_file
             .as_deref()
-            .and_then(|f| f.strip_suffix(".rk"))
+            .and_then(|f| f.strip_suffix(".nv"))
     }
 
     /// Whether this file may touch `module`'s unexported names: its own,
-    /// or the module its `_test` stem pairs with (util_test.rk is inside
-    /// util.rk's trust boundary, Go's same-package tests; section 16.3).
+    /// or the module its `_test` stem pairs with (util_test.nv is inside
+    /// util.nv's trust boundary, Go's same-package tests; section 16.3).
     fn trusts(&self, module: &str) -> bool {
         match self.current_module() {
             Some(c) => c == module || c.strip_suffix("_test") == Some(module),

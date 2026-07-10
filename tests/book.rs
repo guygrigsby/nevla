@@ -1,4 +1,4 @@
-//! Documentation examples stay honest: every rikki snippet in the book,
+//! Documentation examples stay honest: every nevla snippet in the book,
 //! the README, the agent primer, and the playground's dropdown parses,
 //! and every complete program (fn main) typechecks. Nothing is
 //! "remembered" to be kept in sync; drift is a red test.
@@ -22,7 +22,7 @@ fn book_examples_compile() {
             fs::read_to_string(&p).unwrap(),
         ));
     }
-    for extra in ["README.md", "docs/rikki-primer.md", "language-spec.md"] {
+    for extra in ["README.md", "docs/nevla-primer.md", "language-spec.md"] {
         sources.push((
             extra.to_string(),
             fs::read_to_string(root.join(extra)).unwrap(),
@@ -31,13 +31,13 @@ fn book_examples_compile() {
     for (name, text) in &sources {
         let (name, text) = (name.clone(), text.clone());
         let mut rest = text.as_str();
-        while let Some(start) = rest.find("```rikki\n") {
-            rest = &rest[start + "```rikki\n".len()..];
+        while let Some(start) = rest.find("```nevla\n") {
+            rest = &rest[start + "```nevla\n".len()..];
             let Some(end) = rest.find("```") else { break };
             let code = &rest[..end];
             rest = &rest[end..];
             blocks += 1;
-            let prog = match rikki::parser::parse(code) {
+            let prog = match nevla::parser::parse(code) {
                 Ok(p) => p,
                 Err(d) => {
                     failures.push(format!("{name}: does not parse: {d}\n---\n{code}"));
@@ -45,7 +45,7 @@ fn book_examples_compile() {
                 }
             };
             if code.contains("fn main") {
-                if let Err(ds) = rikki::typecheck::check(&prog) {
+                if let Err(ds) = nevla::typecheck::check(&prog) {
                     let msgs: Vec<String> = ds.iter().map(|d| d.to_string()).collect();
                     failures.push(format!(
                         "{name}: does not typecheck:\n{}\n---\n{code}",
@@ -61,9 +61,9 @@ fn book_examples_compile() {
         // odd indices are inside template literals
         if i % 2 == 1 && part.contains("fn main") {
             blocks += 1;
-            match rikki::parser::parse(part) {
+            match nevla::parser::parse(part) {
                 Ok(prog) => {
-                    if let Err(ds) = rikki::typecheck::check(&prog) {
+                    if let Err(ds) = nevla::typecheck::check(&prog) {
                         let msgs: Vec<String> = ds.iter().map(|d| d.to_string()).collect();
                         failures.push(format!(
                             "main.js example does not typecheck:\n{}\n---\n{part}",

@@ -1,5 +1,5 @@
 [package]
-name = "rikki"
+name = "nevla"
 version = "0.1.12"
 edition = "2021"
 license = "MIT"
@@ -22,5 +22,5 @@ pyo3 = { version = "0.29.0", features = ["py-clone"] }
 ureq = "3.3.0"
 
 [[bin]]
-name = "rikki"
+name = "nevla"
 path = "src/main.rs"

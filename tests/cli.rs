@@ -3,15 +3,15 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 fn bin() -> &'static str {
-    env!("CARGO_BIN_EXE_rikki")
+    env!("CARGO_BIN_EXE_nevla")
 }
 
-fn tk() -> &'static str {
-    env!("CARGO_BIN_EXE_tk")
+fn nv() -> &'static str {
+    env!("CARGO_BIN_EXE_nv")
 }
 
 fn tempdir(tag: &str) -> PathBuf {
-    rikki::testutil::tempdir(&format!("cli-{tag}"))
+    nevla::testutil::tempdir(&format!("cli-{tag}"))
 }
 
 /// Wait with a deadline so a child that stops exiting fails the test instead
@@ -46,10 +46,10 @@ fn new_then_run() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(d.join("hello/rikki.toml").exists());
-    // built-against stamp: future breaks say which rikki made the project
-    let toml = std::fs::read_to_string(d.join("hello/rikki.toml")).unwrap();
-    assert!(toml.contains("rikki = \""), "{toml}");
+    assert!(d.join("hello/nevla.toml").exists());
+    // built-against stamp: future breaks say which nevla made the project
+    let toml = std::fs::read_to_string(d.join("hello/nevla.toml")).unwrap();
+    assert!(toml.contains("nevla = \""), "{toml}");
     // agent docs scaffold by default; the executable hook is opt-in
     let primer = std::fs::read_to_string(d.join("hello/AGENTS.md")).unwrap();
     assert!(primer.contains("py bridge"), "primer content missing");
@@ -73,10 +73,10 @@ fn new_then_run() {
         String::from_utf8_lossy(&out.stderr)
     );
     let settings = std::fs::read_to_string(d.join("hooked/.claude/settings.json")).unwrap();
-    assert!(settings.contains("rikki-check.rk"), "{settings}");
-    assert!(d.join("hooked/.claude/hooks/rikki-check.rk").exists());
+    assert!(settings.contains("nevla-check.nv"), "{settings}");
+    assert!(d.join("hooked/.claude/hooks/nevla-check.nv").exists());
     let out = Command::new(bin())
-        .args(["run", "src/main.rk"])
+        .args(["run", "src/main.nv"])
         .current_dir(d.join("hello"))
         .output()
         .unwrap();
@@ -85,7 +85,7 @@ fn new_then_run() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, rikki\n");
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, nevla\n");
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn new_refuses_existing_dir_and_touches_nothing() {
         "mine\n"
     );
     assert!(!proj.join(".claude").exists());
-    assert!(!proj.join("rikki.toml").exists());
+    assert!(!proj.join("nevla.toml").exists());
 }
 
 #[test]
@@ -137,10 +137,10 @@ fn claude_hook_feeds_diagnostics_back() {
         String::from_utf8_lossy(&out.stderr)
     );
     let proj = d.join("h");
-    let hook = proj.join(".claude/hooks/rikki-check.rk");
+    let hook = proj.join(".claude/hooks/nevla-check.nv");
     let bin_dir = PathBuf::from(bin()).parent().unwrap().to_path_buf();
     let run_hook = |file: PathBuf| {
-        let mut child = Command::new(tk())
+        let mut child = Command::new(nv())
             .arg(&hook)
             .env(
                 "PATH",
@@ -162,11 +162,11 @@ fn claude_hook_feeds_diagnostics_back() {
     };
     // a bad edit comes back as diagnostics on stderr with exit 2
     std::fs::write(
-        proj.join("src/main.rk"),
+        proj.join("src/main.nv"),
         "fn main() {\n    if 1 {\n        print(\"x\")\n    }\n}\n",
     )
     .unwrap();
-    let out = run_hook(proj.join("src/main.rk"));
+    let out = run_hook(proj.join("src/main.nv"));
     assert_eq!(out.status.code(), Some(2), "bad edit must exit 2");
     assert!(
         String::from_utf8_lossy(&out.stderr).contains("condition must be bool"),
@@ -175,19 +175,19 @@ fn claude_hook_feeds_diagnostics_back() {
     );
     // a clean edit is silent success
     std::fs::write(
-        proj.join("src/main.rk"),
+        proj.join("src/main.nv"),
         "fn main() {\n    print(\"ok\")\n}\n",
     )
     .unwrap();
-    let out = run_hook(proj.join("src/main.rk"));
+    let out = run_hook(proj.join("src/main.nv"));
     assert_eq!(out.status.code(), Some(0), "clean edit must exit 0");
-    // non-.rk files are ignored
+    // non-.nv files are ignored
     let out = run_hook(proj.join("notes.md"));
-    assert_eq!(out.status.code(), Some(0), "non-rk file must exit 0");
+    assert_eq!(out.status.code(), Some(0), "non-nv file must exit 0");
 }
 
 #[test]
-fn stale_rikki_stamp_warns() {
+fn stale_nevla_stamp_warns() {
     let d = tempdir("stamp");
     let out = Command::new(bin())
         .args(["new", "old"])
@@ -195,13 +195,13 @@ fn stale_rikki_stamp_warns() {
         .output()
         .unwrap();
     assert!(out.status.success());
-    let toml_path = d.join("old/rikki.toml");
+    let toml_path = d.join("old/nevla.toml");
     let toml = std::fs::read_to_string(&toml_path).unwrap();
     let stamped = regex_lite_replace(&toml);
     std::fs::write(&toml_path, stamped).unwrap();
     // the warning only fires on the project py path; give it a py import
     std::fs::write(
-        d.join("old/src/main.rk"),
+        d.join("old/src/main.nv"),
         "import py \"json\"\n\nfn main() (error?) {\n    x := check json.loads(\"1\")\n    print(x)\n    return none\n}\n",
     )
     .unwrap();
@@ -212,15 +212,15 @@ fn stale_rikki_stamp_warns() {
         .unwrap();
     assert!(out.status.success());
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("built against rikki 0.0.1"), "{stderr}");
+    assert!(stderr.contains("built against nevla 0.0.1"), "{stderr}");
 }
 
 /// Swap the stamped version for an ancient one without a regex dep.
 fn regex_lite_replace(toml: &str) -> String {
     let mut out = String::new();
     for line in toml.lines() {
-        if line.starts_with("rikki = ") {
-            out.push_str("rikki = \"0.0.1\"\n");
+        if line.starts_with("nevla = ") {
+            out.push_str("nevla = \"0.0.1\"\n");
         } else {
             out.push_str(line);
             out.push('\n');
@@ -230,8 +230,8 @@ fn regex_lite_replace(toml: &str) -> String {
 }
 
 #[test]
-fn rikki_test_runs_the_suite() {
-    let d = tempdir("rikki-test");
+fn nevla_test_runs_the_suite() {
+    let d = tempdir("nevla-test");
     let out = Command::new(bin())
         .args(["new", "proj"])
         .current_dir(&d)
@@ -240,14 +240,14 @@ fn rikki_test_runs_the_suite() {
     assert!(out.status.success());
     let src = d.join("proj/src");
     std::fs::write(
-        src.join("util.rk"),
+        src.join("util.nv"),
         "fn double(x int) int {\n    return x * 2\n}\nfn Half(n int) (int, error?) {\n    if n % 2 != 0 {\n        return 0, error.new(\"odd number\")\n    }\n    return n / 2, none\n}\n",
     )
     .unwrap();
     std::fs::write(
-        src.join("util_test.rk"),
+        src.join("util_test.nv"),
         r#"import "test"
-import "util.rk"
+import "util.nv"
 
 fn TestDoubleWhitebox() (error?) {
     check test.eq(util.double(21), 42)
@@ -288,28 +288,28 @@ fn TestErrAsserts() (error?) {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!out.status.success(), "a failing test must fail the run");
     assert!(
-        stdout.contains("ok   util_test.rk  TestDoubleWhitebox"),
+        stdout.contains("ok   util_test.nv  TestDoubleWhitebox"),
         "{stdout}"
     );
     assert!(
-        stdout.contains("ok   util_test.rk  TestErrAsserts"),
+        stdout.contains("ok   util_test.nv  TestErrAsserts"),
         "{stdout}"
     );
     assert!(
-        stdout.contains("FAIL util_test.rk  TestHalfFails"),
+        stdout.contains("FAIL util_test.nv  TestHalfFails"),
         "{stdout}"
     );
     // origin points at the failing check's line in the test file
     assert!(
-        stdout.contains("util_test.rk:11: expected 20, got 21"),
+        stdout.contains("util_test.nv:11: expected 20, got 21"),
         "{stdout}"
     );
     assert!(
-        stdout.contains("skip util_test.rk  TestSkipped  (no gpu here)"),
+        stdout.contains("skip util_test.nv  TestSkipped  (no gpu here)"),
         "{stdout}"
     );
     assert!(!stdout.contains("unreachable"), "{stdout}");
-    assert!(stdout.contains("FAIL util_test.rk  TestFaults"), "{stdout}");
+    assert!(stdout.contains("FAIL util_test.nv  TestFaults"), "{stdout}");
     assert!(stdout.contains("index out of bounds"), "{stdout}");
     assert!(
         stdout.contains("3 passed, 2 failed, 1 skipped") || stdout.contains("2 passed"),
@@ -325,7 +325,7 @@ fn TestErrAsserts() (error?) {
 
     // a wrong-shaped Test fn is a hard error, not a silent skip
     std::fs::write(
-        src.join("bad_test.rk"),
+        src.join("bad_test.nv"),
         "fn TestWrong(x int) (error?) {\n    return none\n}\n",
     )
     .unwrap();
@@ -345,7 +345,7 @@ fn TestErrAsserts() (error?) {
 #[test]
 fn fmt_rewrites_and_check_reports() {
     let d = tempdir("fmt");
-    let f = d.join("ugly.rk");
+    let f = d.join("ugly.nv");
     std::fs::write(&f, "fn main(){\n    x:=1+2\n    print( x )\n}\n").unwrap();
     // --check flags it and leaves it alone
     let out = Command::new(bin())
@@ -354,7 +354,7 @@ fn fmt_rewrites_and_check_reports() {
         .output()
         .unwrap();
     assert!(!out.status.success(), "unformatted file must fail --check");
-    assert!(String::from_utf8_lossy(&out.stdout).contains("ugly.rk"));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("ugly.nv"));
     assert!(std::fs::read_to_string(&f).unwrap().contains("x:=1+2"));
     // fmt rewrites in place
     let out = Command::new(bin()).arg("fmt").arg(&f).output().unwrap();
@@ -369,7 +369,7 @@ fn fmt_rewrites_and_check_reports() {
         .unwrap();
     assert!(out.status.success());
     // unparseable source is refused, never rewritten
-    let bad = d.join("broken.rk");
+    let bad = d.join("broken.nv");
     std::fs::write(&bad, "fn main( {\n").unwrap();
     let out = Command::new(bin()).arg("fmt").arg(&bad).output().unwrap();
     assert!(!out.status.success());
@@ -379,7 +379,7 @@ fn fmt_rewrites_and_check_reports() {
 #[test]
 fn check_reports_and_fails() {
     let d = tempdir("check");
-    let bad = d.join("bad.rk");
+    let bad = d.join("bad.nv");
     std::fs::write(
         &bad,
         "fn main() {\n    if 1 {\n        print(\"x\")\n    }\n}\n",
@@ -394,7 +394,7 @@ fn check_reports_and_fails() {
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("condition must be bool"), "{err}");
     // check never runs the program
-    let ok = d.join("ok.rk");
+    let ok = d.join("ok.nv");
     std::fs::write(&ok, "fn main() {\n    print(\"ran\")\n}\n").unwrap();
     let out = Command::new(bin())
         .args(["check"])
@@ -429,8 +429,8 @@ fn bare_run_resolves_project_main() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, rikki\n");
-    // and from a subdirectory, walking up to rikki.toml
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, nevla\n");
+    // and from a subdirectory, walking up to nevla.toml
     let out = Command::new(bin())
         .args(["run"])
         .current_dir(d.join("hello/src"))
@@ -441,7 +441,7 @@ fn bare_run_resolves_project_main() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, rikki\n");
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "hello, nevla\n");
     // bare check works the same way and runs nothing
     let out = Command::new(bin())
         .args(["check"])
@@ -471,38 +471,38 @@ fn bare_run_outside_project_errors() {
         );
         let err = String::from_utf8_lossy(&out.stderr);
         assert!(
-            err.contains("no file given and no rikki project found"),
+            err.contains("no file given and no nevla project found"),
             "{cmd}: {err}"
         );
     }
 }
 
 #[test]
-fn tk_runs_file() {
-    let d = tempdir("tk-file");
-    let f = d.join("hi.rk");
-    std::fs::write(&f, "fn main() {\n    print(\"hi from tk\")\n}\n").unwrap();
-    let out = Command::new(tk()).arg(&f).output().unwrap();
+fn nv_runs_file() {
+    let d = tempdir("nv-file");
+    let f = d.join("hi.nv");
+    std::fs::write(&f, "fn main() {\n    print(\"hi from nv\")\n}\n").unwrap();
+    let out = Command::new(nv()).arg(&f).output().unwrap();
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert_eq!(String::from_utf8_lossy(&out.stdout), "hi from tk\n");
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "hi from nv\n");
 }
 
 #[test]
-fn tk_version_flag() {
-    let out = Command::new(tk()).arg("--version").output().unwrap();
+fn nv_version_flag() {
+    let out = Command::new(nv()).arg("--version").output().unwrap();
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.starts_with("tk "), "{stdout}");
+    assert!(stdout.starts_with("nv "), "{stdout}");
     assert!(stdout.contains("python"), "{stdout}");
 }
 
 #[test]
-fn tk_bare_is_repl() {
-    let mut child = Command::new(tk())
+fn nv_bare_is_repl() {
+    let mut child = Command::new(nv())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -544,15 +544,15 @@ fn repl_survives_a_failing_line() {
 }
 
 #[test]
-fn tk_shebang_script_executes_directly() {
+fn nv_shebang_script_executes_directly() {
     use std::os::unix::fs::PermissionsExt;
-    let d = tempdir("tk-shebang");
+    let d = tempdir("nv-shebang");
     let script = d.join("greet");
     std::fs::write(
         &script,
         format!(
             "#!{}\nfn main() {{\n    print(\"hi from script\")\n}}\n",
-            tk()
+            nv()
         ),
     )
     .unwrap();
@@ -591,13 +591,13 @@ fn repl_evaluates() {
 #[test]
 fn program_args_and_input() {
     let d = tempdir("argsin");
-    let f = d.join("echo.rk");
+    let f = d.join("echo.nv");
     std::fs::write(
         &f,
         "fn main() {\n    for _, a := range args() {\n        print(a)\n    }\n    for {\n        line, err := input(\"> \")\n        if err != none {\n            break\n        }\n        print(\"got: \" + line)\n    }\n}\n",
     )
     .unwrap();
-    let mut child = Command::new(tk())
+    let mut child = Command::new(nv())
         .arg(&f)
         .args([":8080", "llama"])
         .stdin(Stdio::piped())
@@ -621,7 +621,7 @@ fn program_args_and_input() {
 }
 
 #[test]
-fn http_get_post_request_from_rikki() {
+fn http_get_post_request_from_nevla() {
     use std::io::Read;
     // echoes the request line and whether the custom header and body arrived
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -681,7 +681,7 @@ fn http_get_post_request_from_rikki() {
         }
     });
     let d = tempdir("http-req");
-    let f = d.join("h.rk");
+    let f = d.join("h.nv");
     std::fs::write(
         &f,
         r#"import "http"
@@ -703,7 +703,7 @@ fn main() (error?) {
 "#,
     )
     .unwrap();
-    let out = Command::new(tk())
+    let out = Command::new(nv())
         .arg(&f)
         .arg(format!("http://{addr}/"))
         .output()
@@ -748,13 +748,13 @@ fn http_stream_lines_reach_handler() {
         }
     });
     let d = tempdir("stream");
-    let f = d.join("s.rk");
+    let f = d.join("s.nv");
     std::fs::write(
         &f,
         "import \"http\"\nimport \"ctx\"\n\nfn main() (error?) {\n    resp := check http.stream(ctx.background(), args()[0], \"{}\", fn(line str) {\n        if line.starts_with(\"data: \") {\n            print(\"got \" + line[6:len(line)])\n        }\n    })\n    print(resp.status)\n    return none\n}\n",
     )
     .unwrap();
-    let out = Command::new(tk())
+    let out = Command::new(nv())
         .arg(&f)
         .arg(format!("http://{addr}/"))
         .output()

@@ -1,4 +1,4 @@
-import "util_test.rk"
+import "util_test.nv"
 
 fn main() {
     print(util_test.CheckHelper())

@@ -11,19 +11,19 @@ absent value `none`. Anywhere a value can be missing, the type says so:
 a map read is `V?`, a function that might not find its answer returns
 `T?`, a struct field that starts empty is declared `T?`.
 
-```rikki
+```nevla
 struct Profile {
     Name str
     Nick str?       // may be absent
 }
 
 fn main() {
-    p := Profile{Name: "rikki", Nick: none}
+    p := Profile{Name: "nevla", Nick: none}
     n := p.Nick
     if n != none {
         print(n)
     } else {
-        print(p.Name)       // rikki
+        print(p.Name)       // nevla
     }
 }
 ```
@@ -37,7 +37,7 @@ against options; `none == none` is true.
 An option must be narrowed before use. Using it unnarrowed is a compile
 error, not a runtime surprise:
 
-```rikki
+```nevla
 fn main() {
     m := map[str]int{"a": 1}
     v := m["a"]             // v: int?
@@ -57,7 +57,7 @@ Early exits narrow the rest of the function. When one side of the
 branch always diverges (`return`, `break`, `continue`), the narrowing
 survives past the statement:
 
-```rikki
+```nevla
 fn first(xs []int) int {
     if len(xs) == 0 {
         return 0

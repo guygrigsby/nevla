@@ -1,6 +1,6 @@
 # Testing
 
-> This chapter was written first as the design document for `rikki test`
+> This chapter was written first as the design document for `nevla test`
 > and the implementation follows it. Anything that behaves differently is
 > a bug in one of the two.
 
@@ -11,13 +11,13 @@ error, which means everything you already know about errors — `check`,
 
 ## Writing tests
 
-Tests live in `*_test.rk` files beside the code they test, in functions
+Tests live in `*_test.nv` files beside the code they test, in functions
 whose names start with `Test` and whose only result is `error?`:
 
-```rikki
-// util_test.rk
+```nevla
+// util_test.nv
 import "test"
-import "util.rk"
+import "util.nv"
 
 fn TestDouble() (error?) {
     check test.eq(util.Double(21), 42)
@@ -35,20 +35,20 @@ fn TestParseRejectsGarbage() (error?) {
 
 `check` is the assertion propagator: the first failing `test.eq` returns
 its error, and that error is the failure report. Anything else in a
-`_test.rk` file (helpers, lowercase functions, structs) is ordinary code.
+`_test.nv` file (helpers, lowercase functions, structs) is ordinary code.
 
 Run them:
 
 ```sh
-rikki test              # every *_test.rk under the project
-rikki test src/util_test.rk
+nevla test              # every *_test.nv under the project
+nevla test src/util_test.nv
 ```
 
 ```text
-ok   util_test.rk  TestDouble
-ok   util_test.rk  TestParseRejectsGarbage
-FAIL util_test.rk  TestHalf
-     util_test.rk:14: expected 21, got 20
+ok   util_test.nv  TestDouble
+ok   util_test.nv  TestParseRejectsGarbage
+FAIL util_test.nv  TestHalf
+     util_test.nv:14: expected 21, got 20
 2 passed, 1 failed
 ```
 
@@ -74,10 +74,10 @@ custom helper is just a function returning `error?`.
 ## Table tests
 
 Go's table-driven idiom is a stance, not a framework feature: a table is
-a list of structs and the runner is a `for` loop, so rikki has table
+a list of structs and the runner is a `for` loop, so nevla has table
 tests by construction:
 
-```rikki
+```nevla
 struct Case {
     In int
     Want int
@@ -112,7 +112,7 @@ prints the origin with the failure, so `test.eq`'s errors point at the
 `check test.eq(...)` line that produced them. Origins ride the error
 through `check` propagation and `error.wrap`, so a failure deep in a
 helper still names the source line that started it. (Origins are a
-property of all rikki errors, not a test feature; production error
+property of all nevla errors, not a test feature; production error
 reports carry them too.)
 
 ## Isolation and parallelism
@@ -121,7 +121,7 @@ Every test function runs in a fresh interpreter instance: globals,
 imports, and module state are rebuilt per test, and the `test` module's
 bookkeeping hangs off that instance — per-test identity is injected by
 the runtime, not threaded through your code as a handle. Because tests
-share nothing on the rikki side, the runner executes them in parallel by
+share nothing on the nevla side, the runner executes them in parallel by
 default (`-j 1` to serialize).
 
 Two things per-test isolation cannot isolate, both properties of the
@@ -135,7 +135,7 @@ world rather than the runner:
   planned escape hatch; until then, derive per-test paths.
 
 A fault in a test (integer overflow, index out of range) fails that test
-with its rikki stack trace and the run continues; faults cannot cross
+with its nevla stack trace and the run continues; faults cannot cross
 test boundaries because nothing else lives in that interpreter.
 
 Output discipline: `print` output is captured per test and shown only
@@ -149,12 +149,12 @@ for failures. A passing test is silent.
   first table test that genuinely hurts.
 - **Subtests** (`t.Run`): same posture. `test.run(name, fn () (error?))`
   fits the model when named table cases earn it.
-- **In-test concurrency**: rikki has no concurrency yet. When it lands,
-  spawned work inside a test will carry identity the way all rikki code
+- **In-test concurrency**: nevla has no concurrency yet. When it lands,
+  spawned work inside a test will carry identity the way all nevla code
   carries cross-cutting context — through `ctx` — not through a
   test-only handle. This is a standing requirement on the concurrency
   design.
-- **Cleanup**: rikki has no `defer`, so a test that creates external
+- **Cleanup**: nevla has no `defer`, so a test that creates external
   state and fails via `check` skips its own teardown. `with` covers py
   resources; native cleanup is an open language question that testing
   will keep pressure on.
@@ -163,11 +163,11 @@ for failures. A passing test is silent.
 
 ## White box, Go's way
 
-`util_test.rk` sits inside `util.rk`'s trust boundary: the `_test` stem
+`util_test.nv` sits inside `util.nv`'s trust boundary: the `_test` stem
 pairing lets the test file touch `util`'s unexported names — functions,
 struct fields, literals — through the ordinary qualified syntax
 (`util.helper(...)` just compiles there). This is Go's same-package
 testing translated to file modules: decomposed internals are unit-testable
 without exporting them, while every other file still sees only the API.
-The pairing follows the file name, so it holds anywhere a `_test.rk`
+The pairing follows the file name, so it holds anywhere a `_test.nv`
 file appears, and nothing else about visibility changes.

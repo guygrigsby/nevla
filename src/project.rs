@@ -1,6 +1,6 @@
-//! rikki.toml + rikki.lock + the hidden .rikki/ venv, provisioned by
+//! nevla.toml + nevla.lock + the hidden .nevla/ venv, provisioned by
 //! driving uv. The toml and lock fully determine the Python environment;
-//! .rikki/ is disposable and regenerates.
+//! .nevla/ is disposable and regenerates.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -10,10 +10,10 @@ pub struct Project {
     pub root: PathBuf,
     pub name: String,
     pub python: String,
-    /// the rikki version the project was built against (spec 17.4);
+    /// the nevla version the project was built against (spec 17.4);
     /// mismatches warn so breaks say "built against 0.1.5" instead of
     /// producing mystifying compile errors
-    pub rikki: Option<String>,
+    pub nevla: Option<String>,
     pub py_deps: BTreeMap<String, PyDep>,
 }
 
@@ -36,7 +36,7 @@ impl PyDep {
 }
 
 impl Project {
-    /// Walk up from `start` to the nearest directory holding rikki.toml.
+    /// Walk up from `start` to the nearest directory holding nevla.toml.
     /// A relative start is resolved against the working directory first, so
     /// the returned root is always absolute (a root of "" breaks every later
     /// Command::current_dir on it).
@@ -52,7 +52,7 @@ impl Project {
             start.parent()?.to_path_buf()
         };
         loop {
-            if dir.join("rikki.toml").exists() {
+            if dir.join("nevla.toml").exists() {
                 return Some(dir);
             }
             if !dir.pop() {
@@ -62,7 +62,7 @@ impl Project {
     }
 
     pub fn load(root: &Path) -> Result<Project, String> {
-        let path = root.join("rikki.toml");
+        let path = root.join("nevla.toml");
         let src = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         let doc: toml::Table =
             toml::from_str(&src).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -78,9 +78,9 @@ impl Project {
             .and_then(|v| v.as_str())
             .map(str::to_string)
             .unwrap_or_else(crate::bridge::embedded_python);
-        let rikki = doc
+        let nevla = doc
             .get("project")
-            .and_then(|p| p.get("rikki"))
+            .and_then(|p| p.get("nevla"))
             .and_then(|v| v.as_str())
             .map(str::to_string);
         let mut py_deps = BTreeMap::new();
@@ -107,7 +107,7 @@ impl Project {
             root: root.to_path_buf(),
             name,
             python,
-            rikki,
+            nevla,
             py_deps,
         })
     }
@@ -117,8 +117,8 @@ impl Project {
         let mut project = toml::Table::new();
         project.insert("name".into(), s(&self.name));
         project.insert("python".into(), s(&self.python));
-        if let Some(r) = &self.rikki {
-            project.insert("rikki".into(), s(r));
+        if let Some(r) = &self.nevla {
+            project.insert("nevla".into(), s(r));
         }
         let mut doc = toml::Table::new();
         doc.insert("project".into(), toml::Value::Table(project));
@@ -138,17 +138,17 @@ impl Project {
             }
             doc.insert("py-deps".into(), toml::Value::Table(deps));
         }
-        let out = toml::to_string(&doc).map_err(|e| format!("serialize rikki.toml: {e}"))?;
-        std::fs::write(self.root.join("rikki.toml"), out)
-            .map_err(|e| format!("write rikki.toml: {e}"))
+        let out = toml::to_string(&doc).map_err(|e| format!("serialize nevla.toml: {e}"))?;
+        std::fs::write(self.root.join("nevla.toml"), out)
+            .map_err(|e| format!("write nevla.toml: {e}"))
     }
 
     pub fn venv(&self) -> PathBuf {
-        self.root.join(".rikki").join("venv")
+        self.root.join(".nevla").join("venv")
     }
 
     fn lock_path(&self) -> PathBuf {
-        self.root.join("rikki.lock")
+        self.root.join("nevla.lock")
     }
 
     /// First line of every lock: a fingerprint of exactly the inputs that
@@ -156,7 +156,7 @@ impl Project {
     /// manifest drifts from it, hand edits included, the lock is stale.
     fn manifest_stamp(&self) -> String {
         format!(
-            "# rikki-manifest: {}",
+            "# nevla-manifest: {}",
             cheap_hash(&format!("{}\n{}", self.python, self.requirement_lines()))
         )
     }
@@ -214,7 +214,7 @@ impl Project {
         Ok(String::from_utf8_lossy(&out.stdout).to_string())
     }
 
-    /// Regenerate rikki.lock from the declared deps.
+    /// Regenerate nevla.lock from the declared deps.
     pub fn compile_lock(&self, uv_bin: &str) -> Result<(), String> {
         if self.py_deps.is_empty() {
             let _ = std::fs::remove_file(self.lock_path());
@@ -252,15 +252,15 @@ impl Project {
             if !self.venv().exists() {
                 self.uv(
                     uv_bin,
-                    &["venv", ".rikki/venv", "--python", &self.python],
+                    &["venv", ".nevla/venv", "--python", &self.python],
                     None,
                 )?;
             }
             return Ok(());
         }
         let lock = std::fs::read_to_string(self.lock_path())
-            .map_err(|_| "rikki.lock missing; run: rikki py add <pkg>".to_string())?;
-        let marker = self.root.join(".rikki").join("synced");
+            .map_err(|_| "nevla.lock missing; run: nevla py add <pkg>".to_string())?;
+        let marker = self.root.join(".nevla").join("synced");
         let stamp = format!("{}:{}", self.python, cheap_hash(&lock));
         if self.venv().exists() {
             if let Ok(prev) = std::fs::read_to_string(&marker) {
@@ -276,7 +276,7 @@ impl Project {
         }
         self.uv(
             uv_bin,
-            &["venv", ".rikki/venv", "--python", &self.python],
+            &["venv", ".nevla/venv", "--python", &self.python],
             None,
         )?;
         let py = self.venv().join("bin").join("python");
@@ -287,7 +287,7 @@ impl Project {
                 "sync",
                 "--python",
                 &py.to_string_lossy(),
-                "rikki.lock",
+                "nevla.lock",
             ],
             None,
         )?;
@@ -330,7 +330,7 @@ mod tests {
         let bin = dir.join("uv");
         std::fs::write(
             &bin,
-            "#!/bin/sh\necho \"$@\" >> uv-calls.log\nif [ \"$1\" = pip ] && [ \"$2\" = compile ]; then cat > /dev/null; echo 'torch==2.9.0'; fi\nif [ \"$1\" = venv ]; then mkdir -p .rikki/venv/bin; fi\n",
+            "#!/bin/sh\necho \"$@\" >> uv-calls.log\nif [ \"$1\" = pip ] && [ \"$2\" = compile ]; then cat > /dev/null; echo 'torch==2.9.0'; fi\nif [ \"$1\" = venv ]; then mkdir -p .nevla/venv/bin; fi\n",
         )
         .unwrap();
         use std::os::unix::fs::PermissionsExt;
@@ -345,7 +345,7 @@ mod tests {
             root: d.clone(),
             name: "hello".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: [("torch".to_string(), PyDep::any())].into(),
         };
         p.save().unwrap();
@@ -364,7 +364,7 @@ mod tests {
             root: d.clone(),
             name: "hello".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: [(
                 "ruamel.yaml".to_string(),
                 PyDep {
@@ -389,7 +389,7 @@ mod tests {
             root: d.clone(),
             name: "hello".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: [(
                 "mlflow-skinny".to_string(),
                 PyDep {
@@ -416,7 +416,7 @@ mod tests {
             root: d.clone(),
             name: "h".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: BTreeMap::new(),
         };
         p.save().unwrap();
@@ -443,7 +443,7 @@ mod tests {
         );
         assert!(log.contains("pip sync"), "{log}");
         assert!(
-            log.contains("venv .rikki/venv"),
+            log.contains("venv .nevla/venv"),
             "must recreate the venv: {log}"
         );
         assert!(
@@ -465,7 +465,7 @@ mod tests {
             root: d.clone(),
             name: "h".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: BTreeMap::new(),
         };
         p.py_deps.insert(
@@ -482,32 +482,32 @@ mod tests {
         // and --module writes the table form first class
         p.py_add("pillow", Some("PIL"), &uv).unwrap();
         assert_eq!(p.py_deps["pillow"].module.as_deref(), Some("PIL"));
-        let toml = std::fs::read_to_string(d.join("rikki.toml")).unwrap();
+        let toml = std::fs::read_to_string(d.join("nevla.toml")).unwrap();
         assert!(toml.contains("module = \"PIL\""), "{toml}");
     }
 
     #[test]
     fn find_walks_up() {
         let d = tempdir("find");
-        std::fs::write(d.join("rikki.toml"), "[project]\nname = \"x\"\n").unwrap();
+        std::fs::write(d.join("nevla.toml"), "[project]\nname = \"x\"\n").unwrap();
         let deep = d.join("src").join("nested");
         std::fs::create_dir_all(&deep).unwrap();
         assert_eq!(Project::find(&deep).unwrap(), d);
-        assert_eq!(Project::find(&d.join("src/nested/main.rk")).unwrap(), d);
+        assert_eq!(Project::find(&d.join("src/nested/main.nv")).unwrap(), d);
     }
 
-    /// A relative start (`tk src/main.rk`) must yield an absolute root, not
+    /// A relative start (`nv src/main.nv`) must yield an absolute root, not
     /// the empty path: Command::current_dir("") is ENOENT, which surfaced as
     /// a bogus "is uv installed?" on any fresh checkout.
     #[test]
     fn find_from_relative_path_returns_absolute_root() {
         let d = tempdir("find-rel");
-        std::fs::write(d.join("rikki.toml"), "[project]\nname = \"x\"\n").unwrap();
+        std::fs::write(d.join("nevla.toml"), "[project]\nname = \"x\"\n").unwrap();
         std::fs::create_dir_all(d.join("src")).unwrap();
         std::env::set_current_dir(&d).unwrap();
-        let root = Project::find(Path::new("src/main.rk")).unwrap();
+        let root = Project::find(Path::new("src/main.nv")).unwrap();
         assert!(root.is_absolute(), "got {root:?}");
-        assert!(root.join("rikki.toml").exists());
+        assert!(root.join("nevla.toml").exists());
     }
 
     #[test]
@@ -518,16 +518,16 @@ mod tests {
             root: d.clone(),
             name: "hello".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: BTreeMap::new(),
         };
         p.save().unwrap();
         p.py_add("torch", None, &uv).unwrap();
-        let lock = std::fs::read_to_string(d.join("rikki.lock")).unwrap();
+        let lock = std::fs::read_to_string(d.join("nevla.lock")).unwrap();
         assert!(lock.contains("torch==2.9.0"));
         let log = std::fs::read_to_string(d.join("uv-calls.log")).unwrap();
         assert!(log.contains("pip compile --python-version 3.12"), "{log}");
-        assert!(log.contains("venv .rikki/venv --python 3.12"), "{log}");
+        assert!(log.contains("venv .nevla/venv --python 3.12"), "{log}");
         assert!(log.contains("pip sync"), "{log}");
         // second ensure_env is a no-op thanks to the sync marker
         std::fs::write(d.join("uv-calls.log"), "").unwrap();

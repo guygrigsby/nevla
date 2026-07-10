@@ -1,4 +1,4 @@
-import "util.rk"
+import "util.nv"
 
 fn main() {
     p := util.Pair{A: 1, B: 2}

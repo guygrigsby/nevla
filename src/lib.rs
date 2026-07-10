@@ -30,7 +30,7 @@ pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod testutil {
     /// A fresh, empty scratch directory keyed by pid and tag.
     pub fn tempdir(tag: &str) -> std::path::PathBuf {
-        let d = std::env::temp_dir().join(format!("rikki-test-{}-{tag}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("nevla-test-{}-{tag}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -91,8 +91,8 @@ fn on_interp_thread(f: impl FnOnce() -> RunResult + Send + 'static) -> RunResult
         exit: ExitKind::RuntimeError("internal interpreter panic".into()),
     };
     let Ok(handle) = std::thread::Builder::new()
-        .name("rikki-interp".into())
-        // headroom over the recursion cap: 1000 rikki frames nest deep
+        .name("nevla-interp".into())
+        // headroom over the recursion cap: 1000 nevla frames nest deep
         // Rust frames in debug builds, and the reserve is virtual memory
         .stack_size(128 * 1024 * 1024)
         .spawn(f)
@@ -125,7 +125,7 @@ pub fn report(res: RunResult) -> std::process::ExitCode {
 }
 
 /// Resolve the file a CLI command should operate on: the explicit arg if
-/// given, otherwise the enclosing project's src/main.rk.
+/// given, otherwise the enclosing project's src/main.nv.
 pub fn resolve_entry(file: Option<std::path::PathBuf>) -> Result<std::path::PathBuf, String> {
     if let Some(f) = file {
         return Ok(f);
@@ -133,11 +133,11 @@ pub fn resolve_entry(file: Option<std::path::PathBuf>) -> Result<std::path::Path
     let cwd = std::env::current_dir().map_err(|e| format!("cannot read cwd: {e}"))?;
     let Some(root) = project::Project::find(&cwd) else {
         return Err(
-            "no file given and no rikki project found (no rikki.toml in this or any parent directory)"
+            "no file given and no nevla project found (no nevla.toml in this or any parent directory)"
                 .into(),
         );
     };
-    let main = root.join("src").join("main.rk");
+    let main = root.join("src").join("main.nv");
     if !main.exists() {
         return Err(format!(
             "no file given and project entrypoint {} is missing",
@@ -164,7 +164,7 @@ pub struct TestOutcome {
     pub stdout: String,
 }
 
-/// Run every Test function in one `_test.rk` file, each in a fresh
+/// Run every Test function in one `_test.nv` file, each in a fresh
 /// interpreter, `jobs` at a time (0 = one per core). Per the testing
 /// chapter: pass = returned none, skip = the test.skip sentinel, fail =
 /// any other error or a fault; the run always continues.
@@ -329,21 +329,21 @@ fn provision_py(prog: &ast::Program, path: &Path, will_run: bool) -> Result<(), 
         return Ok(());
     };
     let proj = project::Project::load(&root)?;
-    if let Some(built) = &proj.rikki {
+    if let Some(built) = &proj.nevla {
         if built != PKG_VERSION {
             eprintln!(
-                "warning: project was built against rikki {built}; this is {PKG_VERSION} (update the rikki pin in rikki.toml after verifying)"
+                "warning: project was built against nevla {built}; this is {PKG_VERSION} (update the nevla pin in nevla.toml after verifying)"
             );
         }
     }
     let embedded = bridge::embedded_python();
     if proj.python != embedded {
         return Err(format!(
-            "project pins python {} but this rikki embeds {embedded}; set python = {embedded:?} in rikki.toml and rerun rikki py add",
+            "project pins python {} but this nevla embeds {embedded}; set python = {embedded:?} in nevla.toml and rerun nevla py add",
             proj.python
         ));
     }
-    if will_run && (!proj.py_deps.is_empty() || root.join("rikki.lock").exists()) {
+    if will_run && (!proj.py_deps.is_empty() || root.join("nevla.lock").exists()) {
         proj.ensure_env("uv")?;
         bridge::init(Some(&proj.venv()));
     }
@@ -351,7 +351,7 @@ fn provision_py(prog: &ast::Program, path: &Path, will_run: bool) -> Result<(), 
         let top = m.split('.').next().unwrap_or(m);
         if !dep_declared(&proj, top) && !bridge::is_stdlib(top) {
             return Err(format!(
-                "import py {m:?}: not declared in rikki.toml; run: rikki py add {top}"
+                "import py {m:?}: not declared in nevla.toml; run: nevla py add {top}"
             ));
         }
     }
@@ -419,7 +419,7 @@ pub fn run_snippet(src: &str) -> RunResult {
                 path, py: false, ..
             } = d
             {
-                if path.ends_with(".rk") {
+                if path.ends_with(".nv") {
                     return compile_err(format!(
                         "import {path:?}: file imports are not available here"
                     ));
@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn snippet_rejects_file_imports() {
-        let r = run_snippet("import \"util.rk\"\n\nfn main() {\n    print(1)\n}\n");
+        let r = run_snippet("import \"util.nv\"\n\nfn main() {\n    print(1)\n}\n");
         let ExitKind::CompileError(m) = r.exit else {
             panic!("{:?}", r.exit)
         };
@@ -477,7 +477,7 @@ mod tests {
             root: std::path::PathBuf::new(),
             name: "x".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: [("sentence-transformers".to_string(), project::PyDep::any())].into(),
         };
         assert!(dep_declared(&proj, "sentence_transformers"));
@@ -492,7 +492,7 @@ mod tests {
             root: std::path::PathBuf::new(),
             name: "x".into(),
             python: "3.12".into(),
-            rikki: None,
+            nevla: None,
             py_deps: [(
                 "mlflow-skinny".to_string(),
                 project::PyDep {

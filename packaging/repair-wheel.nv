@@ -6,7 +6,7 @@
 // (needs patchelf on PATH). The RECORD is rewritten by hand because this
 // runs on the embedded interpreter, stdlib python only.
 //
-// Usage: tk packaging/repair-wheel.rk WHEEL LIBPYTHON
+// Usage: nv packaging/repair-wheel.nv WHEEL LIBPYTHON
 import "file"
 import py "sys"
 import py "os"
@@ -81,7 +81,7 @@ fn rewriteRecord(root str, distInfo str) (error?) {
 fn main() (error?) {
     argv := args()
     if len(argv) != 2 {
-        return error.new("usage: tk repair-wheel.rk WHEEL LIBPYTHON")
+        return error.new("usage: nv repair-wheel.nv WHEEL LIBPYTHON")
     }
     wheel := argv[0]
     libpython := argv[1]
@@ -113,10 +113,10 @@ fn main() (error?) {
     // list the library as an executable
     check os.makedirs(dataLib, exist_ok: true)
     check shutil.copy2(libpython, dataLib)
-    check os.chmod(dataLib + "/" + lib, 493)  // 0o755; rikki has no octal literals
+    check os.chmod(dataLib + "/" + lib, 493)  // 0o755; nevla has no octal literals
 
     platform := check str(sys.platform)
-    for _, exe := range ["rikki", "tk"] {
+    for _, exe := range ["nevla", "nv"] {
         p := scripts + "/" + exe
         if platform == "darwin" {
             old := check libpythonRef(p)

@@ -14,11 +14,11 @@ struct RunOutput {
 
 #[wasm_bindgen]
 pub fn run(source: &str) -> JsValue {
-    let r = rikki::run_snippet(source);
+    let r = nevla::run_snippet(source);
     let (status, error) = match r.exit {
-        rikki::ExitKind::Ok => ("ok", String::new()),
-        rikki::ExitKind::CompileError(m) => ("compile", m),
-        rikki::ExitKind::RuntimeError(m) => ("runtime", m),
+        nevla::ExitKind::Ok => ("ok", String::new()),
+        nevla::ExitKind::CompileError(m) => ("compile", m),
+        nevla::ExitKind::RuntimeError(m) => ("runtime", m),
     };
     let out = RunOutput {
         stdout: r.stdout,
@@ -37,7 +37,7 @@ struct FmtOutput {
 
 #[wasm_bindgen]
 pub fn fmt(source: &str) -> JsValue {
-    let out = match rikki::format::fmt_source(source) {
+    let out = match nevla::format::fmt_source(source) {
         Ok(code) => FmtOutput {
             ok: true,
             code,
@@ -55,5 +55,5 @@ pub fn fmt(source: &str) -> JsValue {
 #[wasm_bindgen]
 pub fn version() -> String {
     // the interpreter crate's version, not this shim's
-    rikki::PKG_VERSION.to_string()
+    nevla::PKG_VERSION.to_string()
 }

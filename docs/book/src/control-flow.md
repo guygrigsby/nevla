@@ -6,7 +6,7 @@ Conditions are plain `bool` expressions, no parentheses, braces always.
 `else` and `else if` sit on the same line as the closing brace of the
 previous block:
 
-```rikki
+```nevla
 fn describe(n int) str {
     if n < 0 {
         return "negative"
@@ -27,7 +27,7 @@ Conditions narrow option types inside the branches; that mechanism has
 
 ## for: one loop keyword, three forms
 
-```rikki
+```nevla
 fn main() {
     // forever: only break or return leaves it
     n := 0
@@ -68,7 +68,7 @@ body three times), and `_` discards one position
 Iteration variables are fresh bindings each round, so closures created
 in different rounds capture different variables.
 
-```rikki
+```nevla
 fn main() {
     for _, c := range "abc" {
         print(c.upper())

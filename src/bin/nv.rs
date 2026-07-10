@@ -1,5 +1,5 @@
-//! `tk` is the runner (python parity): `tk file.rk` runs a program,
-//! bare `tk` starts the REPL. Toolchain work lives in `rikki`.
+//! `nv` is the runner (python parity): `nv file.nv` runs a program,
+//! bare `nv` starts the REPL. Toolchain work lives in `nevla`.
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -7,18 +7,18 @@ fn main() -> ExitCode {
     match argv.next() {
         Some(flag) if flag == "--version" || flag == "-V" => {
             println!(
-                "tk {} (python {})",
+                "nv {} (python {})",
                 env!("CARGO_PKG_VERSION"),
-                rikki::bridge::embedded_python()
+                nevla::bridge::embedded_python()
             );
             ExitCode::SUCCESS
         }
         Some(file) => {
             let args: Vec<String> = argv.map(|a| a.to_string_lossy().to_string()).collect();
-            rikki::report(rikki::run_with(std::path::Path::new(&file), args, true))
+            nevla::report(nevla::run_with(std::path::Path::new(&file), args, true))
         }
         None => {
-            rikki::repl::run();
+            nevla::repl::run();
             ExitCode::SUCCESS
         }
     }

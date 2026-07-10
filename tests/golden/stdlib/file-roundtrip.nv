@@ -1,7 +1,7 @@
 import "file"
 
 fn main() (error?) {
-    d := "/tmp/rikki-golden-file"
+    d := "/tmp/nevla-golden-file"
     check file.mkdir(d)
     p := d + "/rt.txt"
     check file.write(p, "one\n")

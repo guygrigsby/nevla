@@ -184,7 +184,7 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
     let agent: Agent = Agent::config_builder()
         .timeout_global(Some(timeout))
         .http_status_as_error(false)
-        .user_agent("rikki/0.1")
+        .user_agent("nevla/0.1")
         .build()
         .into();
 
@@ -247,7 +247,7 @@ fn stream(interp: &mut Interp, args: Vec<Value>) -> Result<Value, Fault> {
     let agent: Agent = Agent::config_builder()
         .timeout_global(Some(timeout))
         .http_status_as_error(false)
-        .user_agent("rikki/0.1")
+        .user_agent("nevla/0.1")
         .build()
         .into();
     let mut resp = match agent.post(url).send(body.as_str()) {

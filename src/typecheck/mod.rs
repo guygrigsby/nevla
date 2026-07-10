@@ -1,4 +1,4 @@
-//! The static checking pass, run by `rikki check` and before every run.
+//! The static checking pass, run by `nevla check` and before every run.
 //! Terminology: "check" here is this pass; the language's `check` expression
 //! (ExprKind::Check) is a construct this pass validates like any other.
 

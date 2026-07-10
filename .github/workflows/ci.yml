@@ -16,8 +16,8 @@ jobs:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # the full gate: py goldens are skipped without RIKKI_TEST_PY
-      - run: RIKKI_TEST_PY=1 cargo test
+      # the full gate: py goldens are skipped without NEVLA_TEST_PY
+      - run: NEVLA_TEST_PY=1 cargo test
       # the playground target: the lib must keep building for wasm with the
       # native-only pieces (py bridge, http, signals) gated out
       - run: rustup target add wasm32-unknown-unknown
@@ -41,7 +41,7 @@ jobs:
       - name: seed corpus from the goldens
         run: |
           mkdir -p fuzz/corpus/parse_check
-          find tests/golden -name '*.rk' -exec cp {} fuzz/corpus/parse_check/ \;
+          find tests/golden -name '*.nv' -exec cp {} fuzz/corpus/parse_check/ \;
       # explicit gnu target: the prebuilt cargo-fuzz binary is musl-linked
       # and would otherwise default to a musl build target, which ASan rejects
       - run: cargo fuzz run parse_check --target x86_64-unknown-linux-gnu -- -max_total_time=60

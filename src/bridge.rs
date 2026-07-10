@@ -1,5 +1,5 @@
 //! The only module that names pyo3. The evaluator sees `PyHandle` values and
-//! operations returning rikki values or rikki error values; Python
+//! operations returning nevla values or nevla error values; Python
 //! exceptions never cross this boundary as anything but `ErrVal`.
 
 use std::path::Path;
@@ -11,7 +11,7 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use crate::ast::BinOp;
 use crate::value::{ErrVal, Value, DEPTH_LIMIT};
 
-/// Arc so rikki's deep-copy Clone never needs the GIL; py values are
+/// Arc so nevla's deep-copy Clone never needs the GIL; py values are
 /// shared references by design.
 #[derive(Debug, Clone)]
 pub struct PyHandle(Arc<Py<PyAny>>);
@@ -28,7 +28,7 @@ static INIT: Once = Once::new();
 /// site-packages should be importable; None means bare interpreter.
 pub fn init(venv: Option<&Path>) {
     INIT.call_once(|| {
-        // UTF-8 regardless of host locale: rikki strings are UTF-8 and a
+        // UTF-8 regardless of host locale: nevla strings are UTF-8 and a
         // C-locale box (a bare Linux rig) otherwise trips the embedded
         // interpreter on non-ASCII. PYTHONUTF8 covers the filesystem
         // encoding but empirically does NOT reach embedded stdio (lmtk's
@@ -108,7 +108,7 @@ pub fn init(venv: Option<&Path>) {
             });
         }
         // Inside an embedded interpreter sys.executable is the host binary
-        // (tk); libraries that re-exec `sys.executable -c ...`
+        // (nv); libraries that re-exec `sys.executable -c ...`
         // (multiprocessing, joblib, tokenizers) would invoke the runner.
         // Point it at the venv's real python instead.
         if let Some(v) = venv {
@@ -258,10 +258,10 @@ pub fn next(h: &PyHandle) -> Result<Option<Value>, ErrVal> {
     })
 }
 
-// the exception __exit__ receives when a rikki error propagates out of a
+// the exception __exit__ receives when a nevla error propagates out of a
 // `with` body; subclasses Exception so exits that branch on exception info
 // (transaction rollback, contextlib.suppress) see a real one
-pyo3::create_exception!(rikki, Error, pyo3::exceptions::PyException);
+pyo3::create_exception!(nevla, Error, pyo3::exceptions::PyException);
 
 /// `__enter__` for the with statement; the result is discarded (no binding
 /// form in v1).
@@ -275,7 +275,7 @@ pub fn enter(h: &PyHandle) -> Result<(), ErrVal> {
 }
 
 /// `__exit__` for the with statement. None on a clean exit, the propagating
-/// error on an error-carrying return (synthesized as a `rikki.Error`
+/// error on an error-carrying return (synthesized as a `nevla.Error`
 /// exception, no traceback). Returns the result's truthiness so the caller
 /// can reject suppression attempts.
 pub fn exit(h: &PyHandle, err: Option<&ErrVal>) -> Result<bool, ErrVal> {
@@ -352,12 +352,12 @@ pub fn binop(op: BinOp, l: &Value, r: &Value) -> Result<Value, ErrVal> {
     })
 }
 
-/// rikki → Python for arguments and indexes.
+/// nevla → Python for arguments and indexes.
 fn to_py(py: Python<'_>, v: &Value) -> Result<Py<PyAny>, ErrVal> {
     to_py_depth(py, v, 0)
 }
 
-/// rikki → Python as an owned handle, for the `py(x)` conversion. May be
+/// nevla → Python as an owned handle, for the `py(x)` conversion. May be
 /// the program's first Python touch (no `import py` required), so it
 /// initializes the interpreter.
 pub fn to_py_handle(v: &Value) -> Result<PyHandle, ErrVal> {
@@ -409,7 +409,7 @@ fn to_py_depth(py: Python<'_>, v: &Value, depth: u32) -> Result<Py<PyAny>, ErrVa
     Ok(obj)
 }
 
-/// Python → rikki extraction target (spec 13.5), typed so the caller cannot
+/// Python → nevla extraction target (spec 13.5), typed so the caller cannot
 /// hand the bridge a spec it parses differently.
 pub enum ConvTarget {
     Int,
@@ -432,7 +432,7 @@ pub enum Elem {
     Py,
 }
 
-/// Python → rikki extraction for the fallible conversions.
+/// Python → nevla extraction for the fallible conversions.
 pub fn extract(target: &ConvTarget, h: &PyHandle) -> Result<Value, ErrVal> {
     Python::attach(|py| {
         let b = h.0.bind(py);
@@ -488,7 +488,7 @@ pub fn display(h: &PyHandle) -> String {
 }
 
 /// Is `name` a Python standard-library module? Used by the manifest check:
-/// stdlib imports need no declaration in rikki.toml.
+/// stdlib imports need no declaration in nevla.toml.
 pub fn is_stdlib(name: &str) -> bool {
     init(None);
     Python::attach(|py| {

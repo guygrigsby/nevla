@@ -1,19 +1,19 @@
-# rikki nvim support
+# nevla nvim support
 
-Syntax highlighting for `.rk` plus `rikki check` on save wired into
+Syntax highlighting for `.nv` plus `nevla check` on save wired into
 `vim.diagnostic` (squiggles, `vim.diagnostic.setloclist()` for the list).
-Needs nvim 0.10+ and `rikki` on PATH (`vim.g.rikki_bin` overrides).
+Needs nvim 0.10+ and `nevla` on PATH (`vim.g.nevla_bin` overrides).
 
 lazy.nvim:
 
 ```lua
-{ dir = "~/projects/rikki/editors/nvim" }
+{ dir = "~/projects/nevla/editors/nvim" }
 ```
 
 or plain runtimepath:
 
 ```lua
-vim.opt.rtp:append(vim.fn.expand("~/projects/rikki/editors/nvim"))
+vim.opt.rtp:append(vim.fn.expand("~/projects/nevla/editors/nvim"))
 ```
 
 Deliberately not an LSP or a tree-sitter grammar while the language is

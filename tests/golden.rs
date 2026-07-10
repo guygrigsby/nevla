@@ -1,8 +1,8 @@
 use std::{fs, path::Path, path::PathBuf};
 
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
-    // a directory with a main.rk is one multi-file case; siblings are modules
-    let main = dir.join("main.rk");
+    // a directory with a main.nv is one multi-file case; siblings are modules
+    let main = dir.join("main.nv");
     if main.exists() {
         out.push(main);
         return;
@@ -11,7 +11,7 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
         let p = e.unwrap().path();
         if p.is_dir() {
             collect(&p, out);
-        } else if p.extension().is_some_and(|x| x == "rk") {
+        } else if p.extension().is_some_and(|x| x == "nv") {
             out.push(p);
         }
     }
@@ -34,7 +34,7 @@ fn pending(root: &Path) -> Vec<String> {
 fn golden() {
     // gpu/ cases speak the gputex protocol; point its state dir at a scratch
     // dir so tests never touch real locks (~/.gputex)
-    let gputex = std::env::temp_dir().join(format!("rikki-golden-gputex-{}", std::process::id()));
+    let gputex = std::env::temp_dir().join(format!("nevla-golden-gputex-{}", std::process::id()));
     std::env::set_var("GPUTEX_DIR", &gputex);
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/golden");
     let skip = pending(&root);
@@ -52,11 +52,11 @@ fn golden() {
         if skip.contains(&rel) {
             continue;
         }
-        if rel.starts_with("py/") && std::env::var("RIKKI_TEST_PY").is_err() {
+        if rel.starts_with("py/") && std::env::var("NEVLA_TEST_PY").is_err() {
             continue;
         }
         ran += 1;
-        let res = rikki::run_source(rk);
+        let res = nevla::run_source(rk);
         let out_f = rk.with_extension("out");
         let err_f = rk.with_extension("err");
         if out_f.exists() && err_f.exists() {
@@ -65,7 +65,7 @@ fn golden() {
         }
         let ok = if out_f.exists() {
             let want = fs::read_to_string(&out_f).unwrap();
-            matches!(res.exit, rikki::ExitKind::Ok) && res.stdout == want
+            matches!(res.exit, nevla::ExitKind::Ok) && res.stdout == want
         } else if err_f.exists() {
             let want = fs::read_to_string(&err_f).unwrap();
             // an empty .err would match anything, including success
@@ -74,8 +74,8 @@ fn golden() {
                 continue;
             }
             let got = match &res.exit {
-                rikki::ExitKind::CompileError(m) | rikki::ExitKind::RuntimeError(m) => m.clone(),
-                rikki::ExitKind::Ok => String::new(),
+                nevla::ExitKind::CompileError(m) | nevla::ExitKind::RuntimeError(m) => m.clone(),
+                nevla::ExitKind::Ok => String::new(),
             };
             want.lines()
                 .map(str::trim)

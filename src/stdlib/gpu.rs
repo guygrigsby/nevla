@@ -1,5 +1,5 @@
-//! GPU sharing: rikki speaks the gputex lock protocol directly
-//! (gputex docs/PROTOCOL.md), so a .rk program takes a card without
+//! GPU sharing: nevla speaks the gputex lock protocol directly
+//! (gputex docs/PROTOCOL.md), so a .nv program takes a card without
 //! wrapping itself in the gputex CLI. Each lock is an flock on
 //! $GPUTEX_DIR/<card>.lock (default ~/.gputex); it releases when this
 //! process exits, however it exits, so a crash never strands a card.
@@ -140,7 +140,7 @@ fn write_holder(card: &str, label: &str, preemptible: bool) -> std::io::Result<(
     std::fs::create_dir_all(f.parent().unwrap())?;
     let cmd: Vec<String> = std::env::args().collect();
     let json = format!(
-        "{{\"label\":{},\"framework\":\"rikki\",\"pid\":{},\"host\":{},\"started\":{},\"cmd\":{},\"preemptible\":{}}}\n",
+        "{{\"label\":{},\"framework\":\"nevla\",\"pid\":{},\"host\":{},\"started\":{},\"cmd\":{},\"preemptible\":{}}}\n",
         jstr(label),
         std::process::id(),
         jstr(&hostname()),
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn lock_registers_conflicts_and_releases() {
         use crate::ast::Program;
-        let dir = std::env::temp_dir().join(format!("rikki-gpu-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("nevla-gpu-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::env::set_var("GPUTEX_DIR", &dir);
 
@@ -265,7 +265,7 @@ mod tests {
 
         let hf = holder_file("cardX");
         let json = std::fs::read_to_string(&hf).unwrap();
-        assert!(json.contains(r#""framework":"rikki""#));
+        assert!(json.contains(r#""framework":"nevla""#));
         assert!(json.contains(r#""label":"unit \"test\"""#));
         assert!(json.contains(&format!(r#""pid":{}"#, std::process::id())));
 
@@ -330,18 +330,18 @@ mod tests {
 
     #[test]
     fn env_injection_fills_gaps_only() {
-        let f = std::env::temp_dir().join(format!("rikki-gpu-env-{}", std::process::id()));
+        let f = std::env::temp_dir().join(format!("nevla-gpu-env-{}", std::process::id()));
         std::fs::write(
             &f,
-            "# managed\nRIKKI_GPU_TEST_FILL=from_file\nRIKKI_GPU_TEST_KEEP=from_file\n",
+            "# managed\nNEVLA_GPU_TEST_FILL=from_file\nNEVLA_GPU_TEST_KEEP=from_file\n",
         )
         .unwrap();
         std::env::set_var("GPUTEX_ENV_FILE", &f);
-        std::env::set_var("RIKKI_GPU_TEST_KEEP", "already_set");
-        std::env::remove_var("RIKKI_GPU_TEST_FILL");
+        std::env::set_var("NEVLA_GPU_TEST_KEEP", "already_set");
+        std::env::remove_var("NEVLA_GPU_TEST_FILL");
 
         inject_env();
-        assert_eq!(std::env::var("RIKKI_GPU_TEST_FILL").unwrap(), "from_file");
-        assert_eq!(std::env::var("RIKKI_GPU_TEST_KEEP").unwrap(), "already_set");
+        assert_eq!(std::env::var("NEVLA_GPU_TEST_FILL").unwrap(), "from_file");
+        assert_eq!(std::env::var("NEVLA_GPU_TEST_KEEP").unwrap(), "already_set");
     }
 }

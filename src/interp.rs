@@ -68,7 +68,7 @@ macro_rules! val {
 }
 
 /// val! for callers returning Result<Flow, Fault>. Takes the interpreter so
-/// the unhandled-py fault carries the rikki call stack (macro hygiene keeps
+/// the unhandled-py fault carries the nevla call stack (macro hygiene keeps
 /// `self` out of the expansion).
 macro_rules! sval {
     ($i:expr, $e:expr) => {
@@ -174,7 +174,7 @@ impl<'p> Interp<'p> {
         }
     }
 
-    /// A python error escaping its chain unconsumed; carries the rikki stack.
+    /// A python error escaping its chain unconsumed; carries the nevla stack.
     fn unhandled_py(&self, e: ErrVal) -> Fault {
         self.fault(format!("unhandled python error: {}", e.msg))
     }
@@ -208,7 +208,7 @@ impl<'p> Interp<'p> {
     }
 
     /// Import py modules, then call one nullary function by name: main, or
-    /// a Test function under `rikki test`.
+    /// a Test function under `nevla test`.
     pub fn run_named(&mut self, entry: &str) -> Result<Option<ErrVal>, Fault> {
         for m in self.py_imports.clone() {
             // import the full dotted path (loading the submodule), then bind
@@ -231,8 +231,8 @@ impl<'p> Interp<'p> {
         })
     }
 
-    /// Rikki call-stack depth cap: past this the call faults instead of
-    /// overflowing the Rust stack (each rikki frame is several Rust
+    /// Nevla call-stack depth cap: past this the call faults instead of
+    /// overflowing the Rust stack (each nevla frame is several Rust
     /// frames deep through eval, so the cap must leave real-stack headroom
     /// even in debug builds).
     const RECURSION_LIMIT: usize = 1000;
@@ -689,7 +689,7 @@ impl<'p> Interp<'p> {
         Ok(Flow::Normal)
     }
 
-    /// `with`: __enter__, body, __exit__ on every rikki-level exit. A return
+    /// `with`: __enter__, body, __exit__ on every nevla-level exit. A return
     /// carrying an error becomes a synthesized exception so exits that branch
     /// on exception info (transactions) behave; a fault skips __exit__
     /// entirely (spec 8.9). Exceptions from enter/exit fault.
@@ -712,9 +712,9 @@ impl<'p> Interp<'p> {
         let suppressed =
             crate::bridge::exit(h, err).map_err(|e| self.fault(format!("py with: {}", e.msg)))?;
         if suppressed && had_err {
-            // rikki control flow cannot be resurrected by a py call; loud
+            // nevla control flow cannot be resurrected by a py call; loud
             // beats silently continuing with zeroed results
-            return Err(self.fault("py with: __exit__ cannot suppress a rikki error"));
+            return Err(self.fault("py with: __exit__ cannot suppress a nevla error"));
         }
         Ok(flow)
     }
@@ -870,7 +870,7 @@ impl<'p> Interp<'p> {
                         }
                         return Err(self.fault(format!("undefined: {name}")));
                     };
-                    // descend; errors come back as messages so the rikki
+                    // descend; errors come back as messages so the nevla
                     // stack is cloned only on the failure path. The cell
                     // borrow is safe: steps and value are already evaluated,
                     // nothing below re-enters the evaluator.

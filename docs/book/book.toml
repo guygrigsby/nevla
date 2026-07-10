@@ -1,15 +1,15 @@
 [book]
-title = "The rikki book"
+title = "The nevla book"
 authors = ["Guy J Grigsby"]
 language = "en"
 src = "src"
 
 [output.html]
-git-repository-url = "https://github.com/guygrigsby/rikki"
+git-repository-url = "https://github.com/guygrigsby/nevla"
 site-url = "/book/"
-additional-css = ["theme/rikki.css"]
+additional-css = ["theme/nevla.css"]
 additional-js = ["theme/runnable.js"]
 preferred-dark-theme = "navy"
 
 [preprocessor.runnable]
-command = "../../target/debug/tk preprocess.rk"
+command = "../../target/debug/nv preprocess.nv"

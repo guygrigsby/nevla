@@ -1,11 +1,11 @@
-# rikki design
+# nevla design
 
 The single source for brand and visual decisions. Append decisions here;
 don't scatter them through code comments.
 
 ## Mascot
 
-Rikki the mongoose (`logo.png`; editable source `logo.af`, Affinity
+Nevla the mongoose (`logo.png`; editable source `logo.af`, Affinity
 Designer). The mascot is the brand: it appears in the README (top right,
 200px, below the title so GitHub's h1 rule doesn't cut him) and the
 playground header. Licensed CC BY 4.0 (see `art/LICENSE`); the code is MIT
@@ -26,7 +26,7 @@ and stays that way.
 ## Type
 
 System stacks only, no webfonts: UI in the platform sans, code in the
-platform mono. Code is the point of every rikki surface; it gets the
+platform mono. Code is the point of every nevla surface; it gets the
 visual priority.
 
 ## Playground (decided 2026-07-09)

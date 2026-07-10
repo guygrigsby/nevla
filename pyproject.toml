@@ -3,8 +3,8 @@ requires = ["maturin>=1.7,<2"]
 build-backend = "maturin"
 
 [project]
-name = "rikki-lang"
-description = "Interpreted language with Go's discipline and CPython's ecosystem; ships the rikki and tk binaries"
+name = "nevla-lang"
+description = "Interpreted language with Go's discipline and CPython's ecosystem; ships the nevla and nv binaries"
 requires-python = ">=3.10"
 license = "MIT"
 dynamic = ["version"]

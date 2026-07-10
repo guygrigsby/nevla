@@ -1,4 +1,4 @@
-//! Multi-file loading. `import "util.rk"` pulls in a sibling file whose
+//! Multi-file loading. `import "util.nv"` pulls in a sibling file whose
 //! top-level names are exposed under the file-stem namespace. Implementation:
 //! parse each file once, rename its module-level symbols to `stem.name`
 //! (scope-aware, so locals that shadow them survive), and merge everything
@@ -78,7 +78,7 @@ fn load_file(
             path: p, py: false, ..
         } = d
         {
-            if p.ends_with(".rk") {
+            if p.ends_with(".nv") {
                 load_file(&dir.join(p), FileRole::Imported, loading, loaded, merged)?;
             }
         }
@@ -99,7 +99,7 @@ fn load_file(
             path: p, py: false, ..
         } = d
         {
-            if p.ends_with(".rk") {
+            if p.ends_with(".nv") {
                 *p = Path::new(&p.clone())
                     .file_stem()
                     .map(|s| s.to_string_lossy().to_string())

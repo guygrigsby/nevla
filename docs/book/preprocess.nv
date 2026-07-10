@@ -1,8 +1,8 @@
-// mdBook preprocessor: every complete-program ```rikki block gains a
+// mdBook preprocessor: every complete-program ```nevla block gains a
 // playground link with the program base64url-encoded into the URL
 // fragment, so link and code cannot drift apart. Fragments (no fn main)
 // are left alone; tests/book.rs keeps the blocks themselves compiling.
-// mdBook invokes this as: tk preprocess.rk [supports <renderer>]
+// mdBook invokes this as: nv preprocess.nv [supports <renderer>]
 import py "sys"
 import py "json"
 import py "base64"
@@ -12,11 +12,11 @@ fn linkify(content str) (str, error?) {
     out := ""
     rest := content
     for {
-        i := rest.find("```rikki\n")
+        i := rest.find("```nevla\n")
         if i == none {
             break
         }
-        headEnd := i + len("```rikki\n")
+        headEnd := i + len("```nevla\n")
         out = out + rest[0:headEnd]
         rest = rest[headEnd:len(rest)]
         j := rest.find("```")
@@ -31,7 +31,7 @@ fn linkify(content str) (str, error?) {
             for enc.ends_with("=") {
                 enc = enc.trim_suffix("=")
             }
-            out = out + "\n\n[**▸ run it in the playground**](https://rikki.aeryx.ai/#" + enc + ")\n"
+            out = out + "\n\n[**▸ run it in the playground**](https://nevla.aeryx.ai/#" + enc + ")\n"
         }
     }
     return out + rest, none

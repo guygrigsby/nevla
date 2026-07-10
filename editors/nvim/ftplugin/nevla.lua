@@ -1,19 +1,19 @@
--- rikki filetype plugin: comments + rikki check on save into vim.diagnostic.
-if vim.b.did_rikki_ftplugin then
+-- nevla filetype plugin: comments + nevla check on save into vim.diagnostic.
+if vim.b.did_nevla_ftplugin then
   return
 end
-vim.b.did_rikki_ftplugin = true
+vim.b.did_nevla_ftplugin = true
 
 vim.bo.commentstring = "// %s"
 
-local ns = vim.api.nvim_create_namespace("rikki-check")
+local ns = vim.api.nvim_create_namespace("nevla-check")
 
 local function check(buf)
   local file = vim.api.nvim_buf_get_name(buf)
   if file == "" then
     return
   end
-  local bin = vim.g.rikki_bin or "rikki"
+  local bin = vim.g.nevla_bin or "nevla"
   -- everything vim.diagnostic-shaped runs in vim.schedule: the vim.system
   -- callback is a fast event context where the module may not even load
   vim.system({ bin, "check", file }, { text = true }, function(out)
@@ -51,7 +51,7 @@ local function check(buf)
 end
 
 vim.api.nvim_create_autocmd("BufWritePost", {
-  group = vim.api.nvim_create_augroup("RikkiCheck" .. vim.api.nvim_get_current_buf(), {}),
+  group = vim.api.nvim_create_augroup("NevlaCheck" .. vim.api.nvim_get_current_buf(), {}),
   buffer = vim.api.nvim_get_current_buf(),
   callback = function(a)
     check(a.buf)

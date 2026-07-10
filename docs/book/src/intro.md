@@ -1,14 +1,14 @@
 # Introduction
 
-rikki exists because training and tuning language models means living in
+nevla exists because training and tuning language models means living in
 Python, and Python kept core dumping mid-run. Everything good in ML is a
 python library; everything painful about those runs — the crash twenty
 minutes in, the typo that survives until the epoch ends, the exception
-that ate the metrics — is the language around the libraries. rikki is a
+that ate the metrics — is the language around the libraries. nevla is a
 new language around the same libraries: Go's discipline, CPython's
 ecosystem.
 
-```rikki
+```nevla
 import py "torch"
 
 fn main() (error?) {
@@ -27,14 +27,14 @@ as typed error values instead of tracebacks.
 
 These are the principles the language is built on, each with its reason.
 They are recorded as decisions in the repo's
-[ADRs](https://github.com/guygrigsby/rikki/tree/main/docs/adr); this is
+[ADRs](https://github.com/guygrigsby/nevla/tree/main/docs/adr); this is
 the reader's digest.
 
 **The whole program is checked before any of it runs, and a checked
 program cannot crash the process.** The worst outcomes are an error
-returned from `main` or a controlled runtime fault with a rikki stack
+returned from `main` or a controlled runtime fault with a nevla stack
 trace. The reason is the twenty-minute crash: a training run should die
-at `rikki check`, in milliseconds, or not at all.
+at `nevla check`, in milliseconds, or not at all.
 
 **Errors are values, and handling them is mandatory.** Dropping an error
 is a compile error; `check` propagates, `v, err :=` handles. There is no
@@ -71,20 +71,20 @@ its manifest, releases flow from a git tag to PyPI and Homebrew without
 hands. If keeping two things in sync requires a human to remember,
 that's a bug.
 
-rikki is built primarily for its author and the agents that write most
+nevla is built primarily for its author and the agents that write most
 of its code — and it would be worth building even if it never gains
 another user. That freedom is why the tenets above can be held without
 compromise.
 
 ## Getting started
 
-Try it in [the playground](https://rikki.aeryx.ai/) without installing
+Try it in [the playground](https://nevla.aeryx.ai/) without installing
 anything, or install it:
 
 ```sh
-uv tool install rikki-lang      # or: brew install guygrigsby/tap/rikki
-rikki new hello && cd hello
-rikki run
+uv tool install nevla-lang      # or: brew install guygrigsby/tap/nevla
+nevla new hello && cd hello
+nevla run
 ```
 
 You don't need python installed first: uv fetches a managed CPython for
@@ -93,11 +93,11 @@ does need a matching CPython standard library at runtime, which the uv
 and brew installs both guarantee; a hand-rolled setup missing one gets a
 warning naming the fix (`uv python install <version>`).
 
-Two binaries, split like uv and python: `rikki` does setup (`new`,
-`py add`, `check`, `fmt`, `test`, `run`), `tk` runs code (`tk file.rk`;
-bare `tk` is the repl).
+Two binaries, split like uv and python: `nevla` does setup (`new`,
+`py add`, `check`, `fmt`, `test`, `run`), `nv` runs code (`nv file.nv`;
+bare `nv` is the repl).
 
 This book is the guide. The normative reference is
-[the language spec](https://github.com/guygrigsby/rikki/blob/main/language-spec.md),
+[the language spec](https://github.com/guygrigsby/nevla/blob/main/language-spec.md),
 and every behavior in it is pinned by
-[golden tests](https://github.com/guygrigsby/rikki/tree/main/tests/golden).
+[golden tests](https://github.com/guygrigsby/nevla/tree/main/tests/golden).

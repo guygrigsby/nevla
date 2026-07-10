@@ -10,7 +10,7 @@ fn(...) ...   struct types   error   py
 
 `int` is 64-bit signed and overflow is a fault, never a silent wrap.
 `float` is IEEE 754 double. `str` is an immutable sequence of Unicode
-characters ("character" means code point everywhere in rikki). `bool`
+characters ("character" means code point everywhere in nevla). `bool`
 has exactly `true` and `false`; there is no truthiness, and conditions
 must be `bool`.
 
@@ -32,7 +32,7 @@ Fallibility follows the operand: converting from `str` is a parse and
 returns `(T, error?)`; numeric conversions cannot fail and are used
 inline.
 
-```rikki
+```nevla
 fn main() (error?) {
     n, err := int("42")     // a parse can fail
     if err != none {
@@ -53,19 +53,19 @@ nothing guesses.
 
 ## Value types and reference types
 
-Rikki splits its types the way Go does. Scalars, strings, structs, and
+Nevla splits its types the way Go does. Scalars, strings, structs, and
 errors are value types: assignment, argument passing, and iteration
 bind copies. Lists, maps, functions, and `py` values are reference
 types: one underlying object, however many names point at it.
 
-```rikki
+```nevla
 struct User {
     Name str
     Age  int
 }
 
 fn main() {
-    u := User{Name: "rikki", Age: 1}
+    u := User{Name: "nevla", Age: 1}
     v := u
     v.Age = 99
     print(u.Age)    // 1: structs copy

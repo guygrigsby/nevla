@@ -1,7 +1,7 @@
 # Summary
 
 - [Introduction](intro.md)
-- [A tour of rikki](tour.md)
+- [A tour of nevla](tour.md)
 
 # The language
 

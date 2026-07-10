@@ -1,13 +1,13 @@
-# The Rikki Programming Language Specification
+# The Nevla Programming Language Specification
 
-Version 1 (v1). This document is the normative reference for the rikki
+Version 1 (v1). This document is the normative reference for the nevla
 language: it states what a conforming implementation must do. Rationale and
 design history live in the design document at
 `docs/specs/2026-07-01-mongoose-v1-design.md`; where that document and this
 one could disagree, this one governs the language, and the golden tests under
 `tests/golden/` are its executable companion (see the final chapter).
 
-Source files use the `.rk` extension.
+Source files use the `.nv` extension.
 
 ## Table of contents
 
@@ -33,10 +33,10 @@ Source files use the `.rk` extension.
 
 ## 1. Introduction
 
-Rikki is a statically typed, interpreted language with Go's copy model
+Nevla is a statically typed, interpreted language with Go's copy model
 (scalars and structs copy; lists, maps, and functions are references),
 errors as values, option types instead of nil, and an embedded Python bridge.
-A rikki program is checked in full before any of it runs; a program that
+A nevla program is checked in full before any of it runs; a program that
 passes the checker cannot crash the hosting process at runtime. The worst
 outcomes available to a running program are returning an error from `main`
 and a runtime fault, both of which terminate the program in a controlled way
@@ -93,7 +93,7 @@ lexer. The line feed itself is retained for line counting, so diagnostics on
 subsequent lines report true line numbers. This permits executable scripts:
 
 ```
-#!/usr/bin/env tk
+#!/usr/bin/env nv
 fn main() {
     print("hello")
 }
@@ -537,7 +537,7 @@ Three forms exist, distinguished by the `py` marker and the path string:
 - `import "name"` where `name` is one of the standard library modules
   `math`, `error`, `file`, `ctx`, `gpu`, `http`, `test` imports that
   module (chapter 15).
-- `import "path.rk"` where the path ends in `.rk` imports another rikki
+- `import "path.nv"` where the path ends in `.nv` imports another nevla
   source file as a module (chapter 16).
 - `import py "modname"` imports a Python module through the bridge
   (chapter 13). Dotted module paths (`import py "os.path"`) are permitted.
@@ -768,7 +768,7 @@ the builtin constructors `error.new` and `error.wrap` (section 15.1), and on
 A named argument (`identifier ":" Expression`) binds the value to the named
 Python parameter and is permitted only in calls whose callee is a py value
 (chapter 13); a named argument in any other call is a compile-time error, as
-is a positional argument following a named one. Rikki functions are
+is a positional argument following a named one. Nevla functions are
 positional only.
 
 Arguments are evaluated left to right, after the callee (or receiver)
@@ -853,7 +853,7 @@ Permitted operand types and behavior, for non-`py` operands:
 
 Any other operand type is a compile-time error ("cannot convert").
 
-`[]T` applied to a rikki list performs no per-element checking in v1:
+`[]T` applied to a nevla list performs no per-element checking in v1:
 the list value passes through single-valued, and the expression's static
 type becomes `[]T`. If the actual elements do not match `T`, later operations on them
 fault at runtime. Programs must not rely on this as a checked cast; its
@@ -1211,7 +1211,7 @@ ForStmt = "for" Block
         | "for" Condition Block .
 ```
 
-Rikki has one loop keyword with three forms, as in Go:
+Nevla has one loop keyword with three forms, as in Go:
 
 - `for { ... }` loops forever; only `break` or `return` leaves it.
 - `for cond { ... }` evaluates `cond` (a `bool`) before each iteration and
@@ -1274,7 +1274,7 @@ error ("with needs a py value").
 
 The operand is evaluated to a Python object and its `__enter__` method is
 called; the result is discarded. The block then runs as an ordinary block
-scope, and `__exit__` runs on every rikki-level exit from it:
+scope, and `__exit__` runs on every nevla-level exit from it:
 
 - On normal completion, on `break` or `continue` (which bind to an
   enclosing loop as usual), and on a return whose final `error?` result is
@@ -1289,7 +1289,7 @@ scope, and `__exit__` runs on every rikki-level exit from it:
   branches on exception state (a transaction commit/rollback, for example)
   therefore sees the error path as Python would. If `__exit__` returns a
   truthy value, which in Python suppresses the exception, the program
-  faults ("py with: `__exit__` cannot suppress a rikki error"): rikki
+  faults ("py with: `__exit__` cannot suppress a nevla error"): nevla
   control flow cannot be resumed by a py call. On a falsy return the
   return propagates unchanged.
 
@@ -1487,7 +1487,7 @@ terminates the program with a nonzero exit status (section 17.2).
 
 ### 11.1 Value and reference types
 
-Rikki splits its types the way Go does. **Value types** copy on
+Nevla splits its types the way Go does. **Value types** copy on
 assignment, argument passing, returning, iteration binding, and placement
 in a container: `int`, `float`, `bool`, `str` (immutable), `error`,
 structs, and tuples. A struct copy is shallow in Go's sense: fields of
@@ -1509,7 +1509,7 @@ print(a[0])   // 42
 ```
 
 The zero value of a list or map is a fresh empty container, immediately
-usable; rikki has no nil and no nil-map write fault.
+usable; nevla has no nil and no nil-map write fault.
 
 `clone(x)` returns a one-level copy of a list or map: the container is
 new, its elements are copied by their own kinds (values copy, references
@@ -1550,7 +1550,7 @@ print(ps.contains(Point{x: 1, y: 2}))   // true
 A fault is a runtime error that terminates the program. Faults are not
 catchable in v1: no language construct observes or recovers one. A fault must
 terminate the program with a nonzero exit status and a diagnostic including a
-rikki call-stack trace, and must never crash the hosting process, raise a
+nevla call-stack trace, and must never crash the hosting process, raise a
 foreign exception, or trigger undefined behavior. An interpreter panic is an
 implementation bug, never specified program behavior.
 
@@ -1580,7 +1580,7 @@ The complete set of fault conditions reachable from checked programs:
   implementation's depth limit (a cyclic value; section 11.1), and an
   assignment whose path reaches the same container twice;
 - `__exit__` of a `with` statement returning truthy against a propagating
-  rikki error (section 8.9).
+  nevla error (section 8.9).
 
 Float arithmetic never faults (section 5.1). Reading a map never faults.
 Python exceptions are not faults; they become error values (chapter 13) --
@@ -1625,7 +1625,7 @@ A `py` value supports:
 - the binary operators `+ - * / % @ == != < <= > >=` when either operand
   is `py`, dispatched to the corresponding Python operation and yielding
   `py` (comparisons included: the result is a Python bool as a `py` value,
-  not a rikki `bool`). `@` dispatches to Python matrix multiplication
+  not a nevla `bool`). `@` dispatches to Python matrix multiplication
   (`__matmul__`/`__rmatmul__`); unlike the arithmetic operators it has no
   meaning on native operands (section 7.9).
 
@@ -1639,7 +1639,7 @@ conditions.
 Every operation of section 13.2 may raise a Python exception. As specified in
 section 7.11, a chain of such operations is fallible as a single unit typed
 `(py, error?)` at consumption. The first exception in a chain converts to a
-rikki error value and aborts the remainder of the chain.
+nevla error value and aborts the remainder of the chain.
 
 ### 13.4 Exception conversion
 
@@ -1653,11 +1653,11 @@ A Python exception becomes an error value with:
 
 ### 13.5 Conversions across the bridge
 
-Inbound (rikki value passed as an argument or index to a Python
+Inbound (nevla value passed as an argument or index to a Python
 operation): conversion is automatic, per this table, applied recursively to
 list elements and map entries:
 
-| Rikki | Python |
+| Nevla | Python |
 |----------|--------|
 | `int` | `int` |
 | `float` | `float` |
@@ -1673,7 +1673,7 @@ conversion error at compile time but produces an error value at runtime
 ("cannot pass ... to python"), flowing through the chain's error slot like
 any Python exception.
 
-Outbound (Python object to rikki value): always explicit and fallible,
+Outbound (Python object to nevla value): always explicit and fallible,
 via the conversions of section 7.7 applied to a `py` operand. Each yields
 `(T, error?)`:
 
@@ -1779,7 +1779,7 @@ args() []str
 ```
 
 Returns the program's arguments: everything after the source file on the
-command line (`tk prog.rk a b` and `rikki run prog.rk a b` both yield
+command line (`nv prog.nv a b` and `nevla run prog.nv a b` both yield
 `["a", "b"]`). Takes no arguments. In contexts with no command line (tests,
 embedding) the list is empty.
 
@@ -1864,14 +1864,14 @@ Receiver `str`. Positions and counts are in characters.
   as does a result exceeding the implementation's size limit (2^30 bytes
   in the reference implementation).
 
-```rikki
+```nevla
 fn main() {
-    s := "  the rikki book  "
+    s := "  the nevla book  "
     t := s.trim()
-    print(t.upper())                  // THE RIKKI BOOK
-    print(t.split(" ").join("-"))     // the-rikki-book
-    print(t.replace("book", "spec"))  // the rikki spec
-    i := t.find("rikki")
+    print(t.upper())                  // THE NEVLA BOOK
+    print(t.split(" ").join("-"))     // the-nevla-book
+    print(t.replace("book", "spec"))  // the nevla spec
+    i := t.find("nevla")
     if i != none {
         print(i)                      // 4
     }
@@ -1900,7 +1900,7 @@ Receiver `[]T`.
 - `join(sep str) str` — `T` must be `str`; concatenation with the
   separator.
 
-```rikki
+```nevla
 fn main() {
     xs := [3, 1, 4, 1, 5]
     print(xs.sorted())                          // [1, 1, 3, 4, 5]
@@ -1921,7 +1921,7 @@ Receiver `map[K]V`. Iteration order is insertion order (section 5.3).
 - `delete(k K)` — removes `k` in place, Go's delete; the remaining
   order is preserved.
 
-```rikki
+```nevla
 fn main() {
     m := map[str]int{"b": 2, "a": 1}
     print(m.keys())      // [b, a]: insertion order, not sorted
@@ -1952,7 +1952,7 @@ part of the core language. `import "error"` remains legal and adds nothing.
 - `error.wrap(cause error, msg str) error` — a new error with the
   message and the given cause; `origin` is the wrap site.
 
-```rikki
+```nevla
 fn fetch() (error?) {
     return error.new("connection refused")
 }
@@ -1992,7 +1992,7 @@ Error fields are specified in section 5.7.
   rounding).
 - `math.pi`, `math.e` — `float` constants.
 
-```rikki
+```nevla
 import "math"
 
 fn main() {
@@ -2019,11 +2019,11 @@ Paths are `str`. Contents are UTF-8 `str`; there is no bytes type in v1.
 - `file.mkdir(path str) error?` — create the directory and any missing
   parents.
 
-```rikki
+```nevla
 import "file"
 
 fn main() (error?) {
-    path := "/tmp/rikki-book-example.txt"
+    path := "/tmp/nevla-book-example.txt"
     check file.write(path, "one\n")
     check file.append(path, "two\n")
     body := check file.read(path)
@@ -2056,7 +2056,7 @@ Methods on `Ctx`:
 - `err() error?` — `none` while live; `"deadline exceeded"` or
   `"interrupted"` when done.
 
-```rikki
+```nevla
 import "ctx"
 
 fn main() {
@@ -2072,7 +2072,7 @@ fn main() {
 
 ### 15.6 test
 
-Importing `"test"` provides the helpers `rikki test` is built around
+Importing `"test"` provides the helpers `nevla test` is built around
 (section 17.7); each returns `error?` so it composes with `check`, and
 each failure carries an origin (section 5.7).
 
@@ -2086,7 +2086,7 @@ each failure carries an origin (section 5.7).
 - `test.skip(reason str) error?` — an error the test runner reports as
   skipped rather than failed.
 
-```rikki
+```nevla
 import "test"
 
 fn main() {
@@ -2115,7 +2115,7 @@ struct Response { status int, body str, headers map[str]str }
 - `http.stream(c Ctx, url str, body str, f fn(str)) (Response, error?)`
   — POST, invoking `f` per response line as it arrives.
 
-```rikki
+```nevla
 import "ctx"
 import "http"
 
@@ -2158,7 +2158,7 @@ Behavior:
 
 GPU sharing. The module speaks the gputex lock protocol (an advisory
 flock plus a holder registry under `$GPUTEX_DIR`, default `~/.gputex`;
-the contract is documented in the gputex repository), so a rikki program
+the contract is documented in the gputex repository), so a nevla program
 coordinates with every other job on the host — wrapped in the gputex CLI
 or not — without an external wrapper.
 
@@ -2196,7 +2196,7 @@ Behavior:
 - On non-unix builds (the playground) every `gpu` function faults
   ("gpu.lock is not available in this build").
 
-```rikki
+```nevla
 import "gpu"
 
 fn main() (error?) {
@@ -2221,21 +2221,21 @@ fn main() (error?) {
 
 ### 16.1 File imports
 
-`import "util.rk"` imports another rikki source file. The path is
+`import "util.nv"` imports another nevla source file. The path is
 resolved relative to the directory of the importing file. The imported
 file's exported top-level functions and structs (section 16.3) become
 visible under a namespace
-equal to the file's stem (the file name without `.rk`):
+equal to the file's stem (the file name without `.nv`):
 
 ```
-// util.rk
+// util.nv
 struct Pair { A int, B int }
 fn Double(x int) int { return twice(x) }
-fn twice(x int) int { return x * 2 }    // private to util.rk
+fn twice(x int) int { return x * 2 }    // private to util.nv
 fn Make(a int, b int) Pair { return Pair{A: a, B: b} }
 
-// main.rk
-import "util.rk"
+// main.nv
+import "util.nv"
 
 fn sum(p util.Pair) int { return p.A + p.B }
 
@@ -2288,7 +2288,7 @@ their exported fields read fine; the importer just cannot write the type
 in a literal or touch its unexported fields.
 
 One file is inside another's boundary: a file whose stem is the other's
-plus `_test` (`util_test.rk` for `util.rk`) may use the paired module's
+plus `_test` (`util_test.nv` for `util.nv`) may use the paired module's
 unexported names through the ordinary qualified syntax. Test files are
 same-module code, as in Go. Standard library modules
 (chapter 15) are exempt — their members are defined by this specification
@@ -2302,7 +2302,7 @@ compile-time rule; the REPL is unchecked (section 17.6).
 Program execution begins at `fn main`. `main` must be declared, must take no
 parameters, and must declare either no results or the single result
 `(error?)`. Any other signature, or a missing `main`, is a compile-time
-error. The exception is a test file run by `rikki test` (section 17.7),
+error. The exception is a test file run by `nevla test` (section 17.7),
 whose entry points are its test functions and which needs no `main`.
 
 Before `main` runs, all `import py` modules are imported; a failing Python
@@ -2320,7 +2320,7 @@ A program run terminates in one of four ways:
 | `main` returns (no error) | 0 | none |
 | compile error (lex, parse, or typecheck) | nonzero | each diagnostic as `line:col: message` on standard error; the program does not run at all |
 | `main` returns a non-none error | nonzero | the error's `msg` on standard error |
-| runtime fault (chapter 12) | nonzero | the fault message and a rikki stack trace on standard error |
+| runtime fault (chapter 12) | nonzero | the fault message and a nevla stack trace on standard error |
 
 Program output written by `print`/`printf` up to the point of termination is
 delivered to standard output in all cases. A program that typechecks must
@@ -2328,38 +2328,38 @@ never terminate by crashing the host process.
 
 ### 17.3 The two binaries
 
-- `rikki` is the toolchain: `rikki run [file]` typechecks and runs
-  (defaulting to the enclosing project's `src/main.rk`); `rikki check
+- `nevla` is the toolchain: `nevla run [file]` typechecks and runs
+  (defaulting to the enclosing project's `src/main.nv`); `nevla check
   [file]` typechecks only and never runs code or provisions an environment;
-  `rikki new <name>` scaffolds a project; `rikki py add <pkg>` declares
-  a Python dependency and syncs the environment; `rikki fmt [paths]`
+  `nevla new <name>` scaffolds a project; `nevla py add <pkg>` declares
+  a Python dependency and syncs the environment; `nevla fmt [paths]`
   rewrites source in the canonical style (`--check` reports instead);
-  `rikki test [paths]` runs test functions (section 17.7); `rikki repl`
+  `nevla test [paths]` runs test functions (section 17.7); `nevla repl`
   starts the REPL.
-- `tk` is the runner: `tk file.rk` typechecks and runs the file; bare `tk`
+- `nv` is the runner: `nv file.nv` typechecks and runs the file; bare `nv`
   starts the REPL.
 
-Bare `rikki run` and `rikki check` outside any project fail with a
-diagnostic. `rikki check` on a valid program produces no output and exits
+Bare `nevla run` and `nevla check` outside any project fail with a
+diagnostic. `nevla check` on a valid program produces no output and exits
 0.
 
 ### 17.4 Projects
 
-A project is a directory tree rooted at a `rikki.toml` manifest, found by
+A project is a directory tree rooted at a `nevla.toml` manifest, found by
 walking upward from the file being operated on (or the working directory).
 The layout:
 
-- `rikki.toml`: project name, Python version pin, and declared Python
+- `nevla.toml`: project name, Python version pin, and declared Python
   dependencies (`[py-deps]`).
-- `rikki.lock`: exact resolved Python package versions. Manifest and lock
+- `nevla.lock`: exact resolved Python package versions. Manifest and lock
   together fully determine the Python environment.
-- `.rikki/`: the generated virtual environment and sync markers.
+- `.nevla/`: the generated virtual environment and sync markers.
   Disposable; deleting it is always safe, it regenerates on the next run.
-- `src/main.rk`: the default entry point for bare `rikki run`.
+- `src/main.nv`: the default entry point for bare `nevla run`.
 
-A project's `rikki.toml` may carry `rikki = "x.y.z"`, the version the
-project was built against; `rikki new` writes it. Running or checking
-the project under a different rikki prints a warning naming both
+A project's `nevla.toml` may carry `nevla = "x.y.z"`, the version the
+project was built against; `nevla new` writes it. Running or checking
+the project under a different nevla prints a warning naming both
 versions, so a language change surfaces as "built against 0.1.5" rather
 than a mystifying compile error. The pin never blocks execution.
 
@@ -2367,12 +2367,12 @@ than a mystifying compile error. The pin never blocks execution.
 
 When the compiled file lies inside a project, every `import py "m"` is
 validated at compile time: the top-level segment of `m` (the part before the
-first `.`) must either be declared under `[py-deps]` in `rikki.toml` or be
+first `.`) must either be declared under `[py-deps]` in `nevla.toml` or be
 a module of the Python standard library. Declared names match import names
 case-insensitively with `-` and `_` interchangeable, mirroring PyPI name
 normalization (`sentence-transformers` satisfies
 `import py "sentence_transformers"`). An undeclared import is a compile-time
-error directing the user to `rikki py add`.
+error directing the user to `nevla py add`.
 
 A `[py-deps]` entry is either a version string or a table with optional
 `version` (default `"*"`) and optional `module` naming the import the
@@ -2387,23 +2387,23 @@ mlflow-skinny = { module = "mlflow" }
 A `module` override replaces the package-name match: `mlflow-skinny`
 above satisfies `import py "mlflow"` and no longer satisfies
 `import py "mlflow_skinny"`. Only the package name and version reach the
-dependency resolver. `rikki py add <pkg>` writes the string form;
-`rikki py add <pkg> --module <name>` writes the table form, and
+dependency resolver. `nevla py add <pkg>` writes the string form;
+`nevla py add <pkg> --module <name>` writes the table form, and
 re-adding an existing package preserves its table entry.
 
 Hand-editing `[py-deps]` is first-class: the lock's first line records a
 fingerprint of the resolution inputs (the python pin and the requirement
 lines), and provisioning with a drifted manifest re-resolves the lock
 automatically before syncing the environment. A lock is never trusted
-past its manifest. A changed lock rebuilds `.rikki/venv` from scratch
+past its manifest. A changed lock rebuilds `.nevla/venv` from scratch
 rather than syncing in place: packages that own overlapping directories
 (mlflow and mlflow-skinny both own `mlflow/`) corrupt in-place removals,
 and the venv is disposable by design.
 
 The manifest's `python` pin must match the interpreter embedded in the
-running rikki (major.minor); a mismatch is a compile-time error naming
+running nevla (major.minor); a mismatch is a compile-time error naming
 both versions. When the pin is omitted it defaults to the embedded version.
-`rikki new` scaffolds with the embedded version.
+`nevla new` scaffolds with the embedded version.
 
 Inside a project, `sys.executable` in the embedded interpreter refers to the
 project venv's python, so Python libraries that spawn worker interpreters
@@ -2413,11 +2413,11 @@ Outside a project there is no manifest to check; py imports resolve at
 program start against the embedded interpreter, and a missing module is a
 runtime error (section 13.1). Running a project with declared Python
 dependencies provisions the environment automatically before execution;
-`rikki check` never provisions.
+`nevla check` never provisions.
 
 ### 17.6 The REPL
 
-Bare `tk` (or `rikki repl`) starts an interactive session. The v1 REPL is
+Bare `nv` (or `nevla repl`) starts an interactive session. The v1 REPL is
 unchecked: input goes to the evaluator without typechecking, and faults are
 reported and survived rather than ending the session. A line whose first
 word is `fn`, `struct`, or `import` is treated as a declaration and
@@ -2426,9 +2426,9 @@ statement's value, if any, is printed in canonical rendering. Bindings and
 declarations persist for the session. REPL behavior beyond this paragraph is
 unspecified in v1.
 
-### 17.7 rikki test
+### 17.7 nevla test
 
-`rikki test` discovers `*_test.rk` files (the whole project's `src/` when
+`nevla test` discovers `*_test.nv` files (the whole project's `src/` when
 bare, or the given files and directories) and runs their test functions.
 A test function's name starts with `Test`, takes no parameters, and
 returns `(error?)`; any other `Test`-prefixed shape in a test file is an
@@ -2439,7 +2439,7 @@ Each test function runs in a fresh interpreter instance; tests run in
 parallel (`-j N` bounds the workers, `-j 1` serializes). A test passes
 when it returns `none`, is reported skipped when it returns `test.skip`'s
 sentinel, and fails otherwise; a runtime fault fails its test with the
-rikki stack trace and the run continues. Failure reports lead with the
+nevla stack trace and the run continues. Failure reports lead with the
 error's origin (section 5.7). `print` output is captured per test and
 shown only for failures. The exit status is nonzero when any test fails.
 
@@ -2457,7 +2457,7 @@ Limits a program may rely on, stated as minimum guarantees:
   ("expression too deeply nested"), never a crash. The reference
   implementation's limit is exactly 256.
 - Call depth: an implementation must support at least 1000 simultaneously
-  active rikki function calls. Exceeding the implementation's limit is a
+  active nevla function calls. Exceeding the implementation's limit is a
   runtime fault ("recursion limit exceeded") carrying a (possibly truncated)
   stack trace, never a host stack overflow. The reference implementation's
   limit is exactly 1000.
@@ -2467,7 +2467,7 @@ Limits a program may rely on, stated as minimum guarantees:
 ## 19. Conformance and maintenance
 
 The golden tests under `tests/golden/` are the executable companion to this
-specification: each `.rk` file paired with an `.out` (expected stdout of a
+specification: each `.nv` file paired with an `.out` (expected stdout of a
 successful run) or `.err` (required substrings of the compile or runtime
 diagnostic) fixes observable behavior. A conforming implementation must pass
 them. Where this document and a golden test disagree, the golden test is

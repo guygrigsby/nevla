@@ -1,8 +1,8 @@
-import init, { run, fmt, version } from "./pkg/rikki_playground.js";
+import init, { run, fmt, version } from "./pkg/nevla_playground.js";
 
 const EXAMPLES = {
   "hello world": `fn main() {
-    print("hello, rikki")
+    print("hello, nevla")
 }
 `,
   "errors are values": `fn half(n int) (int, error?) {
@@ -31,7 +31,7 @@ fn main() {
 }
 
 fn main() {
-    u := User{Name: "rikki", Age: 1}
+    u := User{Name: "nevla", Age: 1}
     v := u
     v.Age = 99
     print(u.Age)    // 1: structs copy
@@ -59,8 +59,8 @@ fn main() {
     }
 }
 `,
-  "py bridge (native only)": `// the bridge needs a real CPython; install rikki
-// (uv tool install rikki-lang) to run this one
+  "py bridge (native only)": `// the bridge needs a real CPython; install nevla
+// (uv tool install nevla-lang) to run this one
 import py "json"
 
 fn main() (error?) {
@@ -189,7 +189,7 @@ editor.addEventListener("keydown", (e) => {
 });
 
 await init();
-document.getElementById("version").textContent = `rikki ${version()} · wasm`;
+document.getElementById("version").textContent = `nevla ${version()} · wasm`;
 if (!fromHash()) {
   editor.value = EXAMPLES["hello world"];
 }

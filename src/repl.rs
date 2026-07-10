@@ -17,7 +17,7 @@ pub fn run() {
     interp.repl_init();
     let stdin = std::io::stdin();
     let mut out = std::io::stdout();
-    eprintln!("rikki repl (v1: unchecked). ctrl-d to exit.");
+    eprintln!("nevla repl (v1: unchecked). ctrl-d to exit.");
     loop {
         eprint!("> ");
         let mut line = String::new();

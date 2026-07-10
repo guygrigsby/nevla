@@ -10,7 +10,7 @@ wrapped inner error, or `none`), `origin` (the `file:line` where it was
 born), and, for errors that crossed the Python bridge, `pytype` and
 `traceback`. Construct with `error.new` and `error.wrap`:
 
-```rikki
+```nevla
 fn main() {
     e := error.new("boom")
     w := error.wrap(e, "while testing")
@@ -46,7 +46,7 @@ handled". Handling means one of three things:
 Recovery is the two-value form plus a none-check; flow narrowing
 unwraps the `error?` exactly like any other option:
 
-```rikki
+```nevla
 fn half(n int) (int, error?) {
     if n % 2 != 0 {
         return 0, error.new("odd number")
@@ -72,7 +72,7 @@ error in its final slot and every other slot zero-filled. The enclosing
 function must itself end in `error?`, so propagation is visible in
 every signature it passes through.
 
-```rikki
+```nevla
 fn half(n int) (int, error?) {
     if n % 2 != 0 {
         return 0, error.new("odd number")
@@ -113,7 +113,7 @@ of one flattened string.
 ## Faults are not errors
 
 Some failures do not return: index out of range, integer overflow,
-division by zero. These are faults; they print a rikki stack trace and
+division by zero. These are faults; they print a nevla stack trace and
 terminate with a nonzero exit. Faults are deliberately not catchable,
 and no user program can crash the process any other way. If a failure
 is something a caller could reasonably handle, it is an error value; if

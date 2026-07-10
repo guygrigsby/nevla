@@ -1,22 +1,22 @@
-# A tour of rikki
+# A tour of nevla
 
 Each example links to the playground, where the URL carries the program
 itself; edit and rerun as you go.
 
 ## Hello
 
-```rikki
+```nevla
 fn main() {
-    print("hello, rikki")
+    print("hello, nevla")
 }
 ```
 
 `fn main()` is the entry point. `print` renders anything. Four-space
-indents and `rikki fmt` settles every other style question.
+indents and `nevla fmt` settles every other style question.
 
 ## Errors are values
 
-```rikki
+```nevla
 fn half(n int) (int, error?) {
     if n % 2 != 0 {
         return 0, error.new("odd number")
@@ -39,7 +39,7 @@ is a compile error; you either bind it (`v, err :=`) and decide, or
 propagate it with `check`, which requires your own function to return
 `error?`:
 
-```rikki
+```nevla
 fn quarter(n int) (int, error?) {
     h := check half(n)      // on error: return it, zero values elsewhere
     return check half(h), none
@@ -56,7 +56,7 @@ only when the caller owns the decision.
 
 ## Options, no nil
 
-```rikki
+```nevla
 fn main() {
     m := map[str]int{"a": 1}
     v := m["a"]             // a map read is int?: present or none
@@ -72,14 +72,14 @@ error.
 
 ## The copy model
 
-```rikki
+```nevla
 struct User {
     Name str
     Age int
 }
 
 fn main() {
-    u := User{Name: "rikki", Age: 1}
+    u := User{Name: "nevla", Age: 1}
     v := u
     v.Age = 99
     print(u.Age)    // 1: structs copy
@@ -97,13 +97,13 @@ reference.
 
 ## Modules and visibility
 
-`import "util.rk"` binds a sibling file as module `util`. Capitalized
+`import "util.nv"` binds a sibling file as module `util`. Capitalized
 top-level names are exported; lowercase is private to its file, fields
 included. The Go rule, no keywords.
 
 ## The py bridge
 
-```rikki
+```nevla
 import py "torch"
 
 fn main() (error?) {
@@ -116,16 +116,16 @@ fn main() (error?) {
 ```
 
 A chain of Python operations is one fallible unit: any exception anywhere
-in `model(x).loss.item()` becomes one rikki error at the point of
+in `model(x).loss.item()` becomes one nevla error at the point of
 consumption. Keyword arguments pass through, `@` is matrix
 multiplication, and `for range` iterates any Python iterable. Inside a
-project, every `import py` must be declared (`rikki py add torch`), so a
+project, every `import py` must be declared (`nevla py add torch`), so a
 missing dependency is a compile error rather than a crash twenty minutes
 into a run.
 
 ## with: Python context managers
 
-```rikki
+```nevla
 import py "torch"
 
 fn main() (error?) {

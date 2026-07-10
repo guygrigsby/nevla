@@ -1,4 +1,4 @@
-//! rikki fmt: the canonical style printer
+//! nevla fmt: the canonical style printer
 //! (docs/specs/2026-07-09-fmt-design.md). Parses the source, then prints
 //! the AST back in the one true style, weaving the comments and blank
 //! lines the trivia lexer preserved.

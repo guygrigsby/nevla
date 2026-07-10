@@ -2,22 +2,22 @@
 
 ## File imports
 
-`import "util.rk"` binds a sibling source file as module `util`. The
+`import "util.nv"` binds a sibling source file as module `util`. The
 path is relative to the importing file, the module's name is the file
 stem, and its members are reached with the dot: `util.Double(3)`,
 `util.Pair{...}`. Diamond imports load once; an import cycle is a
 compile error naming the cycle.
 
-```rikki
-// util.rk
+```nevla
+// util.nv
 fn Double(n int) int {
     return n * 2
 }
 ```
 
 ```
-// main.rk
-import "util.rk"
+// main.nv
+import "util.nv"
 
 fn main() {
     print(util.Double(21))      // 42
@@ -44,7 +44,7 @@ module boundaries only.
 
 ## Test files are inside the boundary
 
-A file named `util_test.rk` sees `util.rk`'s unexported names through
+A file named `util_test.nv` sees `util.nv`'s unexported names through
 the ordinary qualified syntax, exactly like Go's same-package tests.
 The [testing chapter](testing.md) covers the rest.
 
@@ -52,7 +52,7 @@ The [testing chapter](testing.md) covers the rest.
 
 ```
 import "file"           // standard library (math, error, file, ctx, gpu, http, test)
-import "util.rk"        // another rikki file, namespaced by stem
+import "util.nv"        // another nevla file, namespaced by stem
 import py "torch"       // a Python module through the bridge
 ```
 

@@ -1,14 +1,14 @@
-# Writing rikki (agent primer)
+# Writing nevla (agent primer)
 
-rikki is a statically typed, interpreted language: Go's discipline,
-CPython's ecosystem. Files end in `.rk`. Run with `tk file.rk`; typecheck
-with `rikki check` (no argument inside a project). The whole program is
+nevla is a statically typed, interpreted language: Go's discipline,
+CPython's ecosystem. Files end in `.nv`. Run with `nv file.nv`; typecheck
+with `nevla check` (no argument inside a project). The whole program is
 checked before any of it runs. Trust the checker's messages; they name the
 fix.
 
 ## Shape of a program
 
-```rikki
+```nevla
 import "error"
 import py "torch"
 
@@ -92,10 +92,10 @@ are compile errors. Other bridge rules:
   `param.requires_grad = false`, `batch["labels"] = y`.
 - `with expr { }` runs a Python context manager (`torch.no_grad()`);
   exceptions in enter/exit fault. Acquire fallibly before the statement.
-- Convert py -> rikki with `int(x)`, `float(x)`, `bool(x)`, `str(x)`,
+- Convert py -> nevla with `int(x)`, `float(x)`, `bool(x)`, `str(x)`,
   `[]int(x)` etc; all fallible, so `check` or destructure them.
 - In a project, every `import py` module must be declared:
-  `rikki py add torch`. Python stdlib modules need no declaration.
+  `nevla py add torch`. Python stdlib modules need no declaration.
 
 ## Copy model
 
@@ -129,9 +129,9 @@ Stdlib modules (plain `import "name"`): `error`, `math` (`abs`, `min`,
 fallible), `ctx` (`background`, `timeout`, `interrupt` cancellation
 handles), `http` (`get`/`post`/`request`/`stream`, all take a `Ctx`).
 
-Multi-file: `import "util.rk"` binds the sibling file as module `util`.
+Multi-file: `import "util.nv"` binds the sibling file as module `util`.
 Only Capitalized top-level names (functions, structs, fields) are visible
 across modules, Go's rule; lowercase is private to its file.
 
-The normative reference is `language-spec.md` in the rikki repo;
+The normative reference is `language-spec.md` in the nevla repo;
 `tests/golden/` there is a corpus of small correct programs.

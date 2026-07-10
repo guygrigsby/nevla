@@ -1,6 +1,6 @@
 //! The flagship path: a real project, a real venv, a tiny CPU pretrain.
 //! Heavy (downloads torch on a cold uv cache), so it only runs with
-//! RIKKI_TEST_TORCH=1; the default gate stays stdlib-python only.
+//! NEVLA_TEST_TORCH=1; the default gate stays stdlib-python only.
 
 use std::process::Command;
 
@@ -44,7 +44,7 @@ fn main() (error?) {
 "#;
 
 // manual attention through the `@` operator vs the fused kernel; on CPU
-// SDPA is the math backend, so this pins rikki's matmul/softmax path
+// SDPA is the math backend, so this pins nevla's matmul/softmax path
 // against torch's reference, not flash-vs-not (that is torch's lane)
 const ATTN_RK: &str = r#"import "math"
 import py "torch"
@@ -76,12 +76,12 @@ fn main() (error?) {
 
 #[test]
 fn tiny_cpu_pretrain() {
-    if std::env::var("RIKKI_TEST_TORCH").is_err() {
-        eprintln!("skipping: set RIKKI_TEST_TORCH=1 (downloads torch on a cold cache)");
+    if std::env::var("NEVLA_TEST_TORCH").is_err() {
+        eprintln!("skipping: set NEVLA_TEST_TORCH=1 (downloads torch on a cold cache)");
         return;
     }
-    let d = rikki::testutil::tempdir("torch-e2e");
-    let bin = env!("CARGO_BIN_EXE_rikki");
+    let d = nevla::testutil::tempdir("torch-e2e");
+    let bin = env!("CARGO_BIN_EXE_nevla");
     let out = Command::new(bin)
         .args(["new", "train"])
         .current_dir(&d)
@@ -101,10 +101,10 @@ fn tiny_cpu_pretrain() {
         .unwrap();
     assert!(
         out.status.success(),
-        "rikki py add torch: {}",
+        "nevla py add torch: {}",
         String::from_utf8_lossy(&out.stderr)
     );
-    std::fs::write(proj.join("src/main.rk"), TRAIN_RK).unwrap();
+    std::fs::write(proj.join("src/main.nv"), TRAIN_RK).unwrap();
     let out = Command::new(bin)
         .args(["run"])
         .current_dir(&proj)
@@ -120,9 +120,9 @@ fn tiny_cpu_pretrain() {
     assert!(stdout.contains("converged"), "w missed 3.0:\n{stdout}");
 
     // same provisioned project, second program: attention both ways
-    std::fs::write(proj.join("src/attn.rk"), ATTN_RK).unwrap();
+    std::fs::write(proj.join("src/attn.nv"), ATTN_RK).unwrap();
     let out = Command::new(bin)
-        .args(["run", "src/attn.rk"])
+        .args(["run", "src/attn.nv"])
         .current_dir(&proj)
         .output()
         .unwrap();

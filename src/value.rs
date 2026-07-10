@@ -43,7 +43,7 @@ pub enum Value {
     Py(crate::bridge::PyHandle),
     Err(ErrVal),
     Fn(FnRef),
-    /// A rikki stdlib module or file-import namespace, by name. Python
+    /// A nevla stdlib module or file-import namespace, by name. Python
     /// modules are not these; they are `Py` handles.
     Module(String),
     /// Opaque context: deadline plus interrupt flag. Shared by reference,

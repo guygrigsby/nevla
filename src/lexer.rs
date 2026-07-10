@@ -376,16 +376,16 @@ mod tests {
     #[test]
     fn shebang_skipped_at_file_start() {
         assert_eq!(
-            toks("#!/usr/bin/env tk\nx := 1"),
+            toks("#!/usr/bin/env nv\nx := 1"),
             vec![Ident("x".into()), ColonEq, Int(1)]
         );
         // shebang line still counts for line numbers
-        let t = lex("#!/bin/tk\nx := 1").unwrap();
+        let t = lex("#!/bin/nv\nx := 1").unwrap();
         assert_eq!(t[0].line, 2);
         // whole file is just a shebang: no tokens
-        assert_eq!(toks("#!/bin/tk"), vec![]);
+        assert_eq!(toks("#!/bin/nv"), vec![]);
         // only at file start; '#' later is still an error
-        assert!(lex("x := 1\n#!/bin/tk").is_err());
+        assert!(lex("x := 1\n#!/bin/nv").is_err());
     }
 
     #[test]

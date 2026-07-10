@@ -30,23 +30,23 @@ jobs:
           tool: wasm-pack,mdbook
       - name: build the playground
         run: |
-          # the book's preprocessor and reference generator are rikki
+          # the book's preprocessor and reference generator are nevla
           # programs; build the runner first
-          cargo build --bin tk
+          cargo build --bin nv
           cd playground
           wasm-pack build --target web --release
           mkdir -p ../dist/pkg
           cp site/index.html site/style.css site/main.js ../dist/
-          cp pkg/rikki_playground.js pkg/rikki_playground_bg.wasm ../dist/pkg/
+          cp pkg/nevla_playground.js pkg/nevla_playground_bg.wasm ../dist/pkg/
           cp ../art/logo.png ../dist/
-          (cd .. && ./target/debug/tk docs/book/gen-reference.rk)
+          (cd .. && ./target/debug/nv docs/book/gen-reference.nv)
           mdbook build ../docs/book -d "$(pwd)/../dist/book"
           # cache-bust every asset chain with the commit: Pages caches for
           # ten minutes and a fresh html over stale css shears the layout
           v="${GITHUB_SHA::8}"
           sed -i "s|style.css|style.css?v=$v|; s|main.js|main.js?v=$v|" ../dist/index.html
-          sed -i "s|./pkg/rikki_playground.js|./pkg/rikki_playground.js?v=$v|" ../dist/main.js
-          sed -i "s|rikki_playground_bg.wasm|rikki_playground_bg.wasm?v=$v|" ../dist/pkg/rikki_playground.js
+          sed -i "s|./pkg/nevla_playground.js|./pkg/nevla_playground.js?v=$v|" ../dist/main.js
+          sed -i "s|nevla_playground_bg.wasm|nevla_playground_bg.wasm?v=$v|" ../dist/pkg/nevla_playground.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

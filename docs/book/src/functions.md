@@ -7,7 +7,7 @@ declared type, results come after the parameter list, and a function
 with results must return on every path; the checker rejects a missing
 return at compile time, not twenty minutes into a run.
 
-```rikki
+```nevla
 fn double(n int) int {
     return n * 2
 }
@@ -40,7 +40,7 @@ context that supplies the function type, parameter types can be
 omitted, and a literal whose body is a single expression returns that
 expression's value:
 
-```rikki
+```nevla
 fn main() {
     nums := [1, 2, 3, 4]
     big := nums.map(fn(x) { x * 2 }).filter(fn(x) { x > 2 }).sum()
@@ -51,7 +51,7 @@ fn main() {
 Closures capture by reference, as in Go: the closure and the enclosing
 scope share the variable, and writes flow both ways.
 
-```rikki
+```nevla
 fn main() {
     total := 0
     add := fn(x int) { total = total + x }
@@ -70,16 +70,16 @@ made in different rounds capture different variables.
 or line breaks. A struct literal names the type and supplies every
 field exactly once, in any order:
 
-```rikki
+```nevla
 struct User {
     Name str
     Age  int
 }
 
 fn main() {
-    u := User{Age: 1, Name: "rikki"}
+    u := User{Age: 1, Name: "nevla"}
     u.Age = 2
-    print(u.Name, u.Age)    // rikki 2
+    print(u.Name, u.Age)    // nevla 2
 }
 ```
 
@@ -92,7 +92,7 @@ functions that take the struct.
 A struct must not contain itself by value; such a value could never be
 constructed. Break the cycle with an option:
 
-```rikki
+```nevla
 struct Node {
     val  int
     next Node?      // `next Node` would be a compile error

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 #[derive(Parser)]
-#[command(name = "rikki", version, about = "the rikki language")]
+#[command(name = "nevla", version, about = "the nevla language")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -11,15 +11,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Typecheck and run a program (defaults to the project's src/main.rk)
+    /// Typecheck and run a program (defaults to the project's src/main.nv)
     Run {
         file: Option<PathBuf>,
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
     },
-    /// Typecheck only (defaults to the project's src/main.rk)
+    /// Typecheck only (defaults to the project's src/main.nv)
     Check { file: Option<PathBuf> },
-    /// Run Test functions in *_test.rk files (defaults to the project)
+    /// Run Test functions in *_test.nv files (defaults to the project)
     Test {
         paths: Vec<PathBuf>,
         /// Parallel test workers (default: one per core; 1 serializes)
@@ -65,9 +65,9 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.cmd {
         Cmd::Run { file, args } => with_entry(file, |f| {
-            rikki::report(rikki::run_with(f, args.clone(), true))
+            nevla::report(nevla::run_with(f, args.clone(), true))
         }),
-        Cmd::Check { file } => with_entry(file, |f| rikki::report(rikki::check_source(f))),
+        Cmd::Check { file } => with_entry(file, |f| nevla::report(nevla::check_source(f))),
         Cmd::Fmt { paths, check } => fmt_cmd(paths, check),
         Cmd::Test { paths, jobs } => test_cmd(paths, jobs.unwrap_or(0)),
         Cmd::Py {
@@ -75,16 +75,16 @@ fn main() -> ExitCode {
         } => py_add(&package, module.as_deref()),
         Cmd::New { name, claude_hook } => new_project(&name, claude_hook),
         Cmd::Repl => {
-            rikki::repl::run();
+            nevla::repl::run();
             ExitCode::SUCCESS
         }
     }
 }
 
 /// Resolve the file to operate on: the explicit arg if given, otherwise the
-/// enclosing project's src/main.rk; then run `f` on it.
+/// enclosing project's src/main.nv; then run `f` on it.
 fn with_entry(file: Option<PathBuf>, f: impl FnOnce(&std::path::Path) -> ExitCode) -> ExitCode {
-    match rikki::resolve_entry(file) {
+    match nevla::resolve_entry(file) {
         Ok(path) => f(&path),
         Err(e) => {
             eprintln!("error: {e}");
@@ -102,19 +102,19 @@ fn new_project(name: &str, claude_hook: bool) -> ExitCode {
     let make = || -> std::io::Result<()> {
         std::fs::create_dir_all(root.join("src"))?;
         std::fs::write(
-            root.join("rikki.toml"),
+            root.join("nevla.toml"),
             format!(
-                "[project]\nname = {name:?}\npython = {:?}\nrikki = {:?}\n",
-                rikki::bridge::embedded_python(),
-                rikki::PKG_VERSION
+                "[project]\nname = {name:?}\npython = {:?}\nnevla = {:?}\n",
+                nevla::bridge::embedded_python(),
+                nevla::PKG_VERSION
             ),
         )?;
         std::fs::write(
-            root.join("src").join("main.rk"),
-            "fn main() {\n    print(\"hello, rikki\")\n}\n",
+            root.join("src").join("main.nv"),
+            "fn main() {\n    print(\"hello, nevla\")\n}\n",
         )?;
-        std::fs::write(root.join(".gitignore"), ".rikki/\n")?;
-        // agents writing rikki: the primer, loaded by anything that reads
+        std::fs::write(root.join(".gitignore"), ".nevla/\n")?;
+        // agents writing nevla: the primer, loaded by anything that reads
         // AGENTS.md or CLAUDE.md; the executable check-after-every-edit
         // hook only lands when asked for
         std::fs::write(root.join("AGENTS.md"), PRIMER)?;
@@ -122,16 +122,16 @@ fn new_project(name: &str, claude_hook: bool) -> ExitCode {
         if claude_hook {
             std::fs::create_dir_all(root.join(".claude/hooks"))?;
             std::fs::write(root.join(".claude/settings.json"), HOOK_SETTINGS)?;
-            std::fs::write(root.join(".claude/hooks/rikki-check.rk"), HOOK_CHECK)?;
+            std::fs::write(root.join(".claude/hooks/nevla-check.nv"), HOOK_CHECK)?;
         }
         Ok(())
     };
     match make() {
         Ok(()) => {
             if claude_hook {
-                println!("created {name}/ (rikki.toml, src/main.rk, AGENTS.md, .claude/)");
+                println!("created {name}/ (nevla.toml, src/main.nv, AGENTS.md, .claude/)");
             } else {
-                println!("created {name}/ (rikki.toml, src/main.rk, AGENTS.md)");
+                println!("created {name}/ (nevla.toml, src/main.nv, AGENTS.md)");
                 println!(
                     "tip: --claude-hook adds a Claude Code hook that typechecks after every edit"
                 );
@@ -146,8 +146,8 @@ fn new_project(name: &str, claude_hook: bool) -> ExitCode {
 }
 
 /// The agent primer, kept in the repo as the single source and baked into
-/// the binary so `rikki new` can scaffold it.
-const PRIMER: &str = include_str!("../docs/rikki-primer.md");
+/// the binary so `nevla new` can scaffold it.
+const PRIMER: &str = include_str!("../docs/nevla-primer.md");
 
 const HOOK_SETTINGS: &str = r#"{
   "hooks": {
@@ -157,7 +157,7 @@ const HOOK_SETTINGS: &str = r#"{
         "hooks": [
           {
             "type": "command",
-            "command": "tk \"$CLAUDE_PROJECT_DIR/.claude/hooks/rikki-check.rk\""
+            "command": "nv \"$CLAUDE_PROJECT_DIR/.claude/hooks/nevla-check.nv\""
           }
         ]
       }
@@ -166,7 +166,7 @@ const HOOK_SETTINGS: &str = r#"{
 }
 "#;
 
-const HOOK_CHECK: &str = r#"// PostToolUse hook: typecheck after every .rk edit, feed diagnostics back.
+const HOOK_CHECK: &str = r#"// PostToolUse hook: typecheck after every .nv edit, feed diagnostics back.
 import "file"
 import py "sys"
 import py "json"
@@ -185,17 +185,17 @@ fn main() (error?) {
         return none
     }
     path := check str(pathv)
-    if !path.ends_with(".rk") {
+    if !path.ends_with(".nv") {
         return none
     }
     // inside a project, check the whole program from its entrypoint; a
     // lone module file has no main and cannot be checked standalone
     workdir := check str(os.path.dirname(os.path.abspath(path)))
-    cmd := ["rikki", "check", path]
+    cmd := ["nevla", "check", path]
     probe := workdir
     for {
-        if file.exists(probe + "/rikki.toml") {
-            cmd = ["rikki", "check"]
+        if file.exists(probe + "/nevla.toml") {
+            cmd = ["nevla", "check"]
             break
         }
         parent := check str(os.path.dirname(probe))
@@ -204,7 +204,7 @@ fn main() (error?) {
         }
         probe = parent
     }
-    // no rikki on PATH or a wedged check: stay out of the way
+    // no nevla on PATH or a wedged check: stay out of the way
     r, rerr := subprocess.run(cmd, cwd: workdir, capture_output: true, text: true, timeout: 30)
     if rerr != none {
         return none
@@ -224,14 +224,14 @@ fn test_cmd(paths: Vec<PathBuf>, jobs: usize) -> ExitCode {
     let mut files = vec![];
     if paths.is_empty() {
         let cwd = std::env::current_dir().unwrap_or_default();
-        let Some(root) = rikki::project::Project::find(&cwd) else {
-            eprintln!("error: no paths given and no rikki project found");
+        let Some(root) = nevla::project::Project::find(&cwd) else {
+            eprintln!("error: no paths given and no nevla project found");
             return ExitCode::FAILURE;
         };
         collect_rk(&root.join("src"), &mut files);
         files.retain(|f| {
             f.file_name()
-                .is_some_and(|n| n.to_string_lossy().ends_with("_test.rk"))
+                .is_some_and(|n| n.to_string_lossy().ends_with("_test.nv"))
         });
     } else {
         for p in paths {
@@ -240,7 +240,7 @@ fn test_cmd(paths: Vec<PathBuf>, jobs: usize) -> ExitCode {
                 collect_rk(&p, &mut all);
                 all.retain(|f| {
                     f.file_name()
-                        .is_some_and(|n| n.to_string_lossy().ends_with("_test.rk"))
+                        .is_some_and(|n| n.to_string_lossy().ends_with("_test.nv"))
                 });
                 files.extend(all);
             } else {
@@ -250,7 +250,7 @@ fn test_cmd(paths: Vec<PathBuf>, jobs: usize) -> ExitCode {
     }
     files.sort();
     if files.is_empty() {
-        eprintln!("no *_test.rk files found");
+        eprintln!("no *_test.nv files found");
         return ExitCode::FAILURE;
     }
     let (mut passed, mut failed, mut skipped) = (0u32, 0u32, 0u32);
@@ -259,7 +259,7 @@ fn test_cmd(paths: Vec<PathBuf>, jobs: usize) -> ExitCode {
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| f.display().to_string());
-        match rikki::run_test_file(f, jobs) {
+        match nevla::run_test_file(f, jobs) {
             Err(e) => {
                 println!("FAIL {short}");
                 println!("     {e}");
@@ -268,15 +268,15 @@ fn test_cmd(paths: Vec<PathBuf>, jobs: usize) -> ExitCode {
             Ok(outcomes) => {
                 for o in outcomes {
                     match o.status {
-                        rikki::TestStatus::Pass => {
+                        nevla::TestStatus::Pass => {
                             passed += 1;
                             println!("ok   {short}  {}", o.name);
                         }
-                        rikki::TestStatus::Skip => {
+                        nevla::TestStatus::Skip => {
                             skipped += 1;
                             println!("skip {short}  {}  ({})", o.name, o.message);
                         }
-                        rikki::TestStatus::Fail => {
+                        nevla::TestStatus::Fail => {
                             failed += 1;
                             println!("FAIL {short}  {}", o.name);
                             for line in o.message.lines() {
@@ -307,8 +307,8 @@ fn fmt_cmd(paths: Vec<PathBuf>, check: bool) -> ExitCode {
     let mut files = vec![];
     if paths.is_empty() {
         let cwd = std::env::current_dir().unwrap_or_default();
-        let Some(root) = rikki::project::Project::find(&cwd) else {
-            eprintln!("error: no paths given and no rikki project found");
+        let Some(root) = nevla::project::Project::find(&cwd) else {
+            eprintln!("error: no paths given and no nevla project found");
             return ExitCode::FAILURE;
         };
         collect_rk(&root.join("src"), &mut files);
@@ -333,7 +333,7 @@ fn fmt_cmd(paths: Vec<PathBuf>, check: bool) -> ExitCode {
                 continue;
             }
         };
-        let formatted = match rikki::format::fmt_source(&src) {
+        let formatted = match nevla::format::fmt_source(&src) {
             Ok(s) => s,
             Err(d) => {
                 // never rewrite what we cannot parse
@@ -368,7 +368,7 @@ fn collect_rk(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
         let p = e.path();
         if p.is_dir() {
             collect_rk(&p, out);
-        } else if p.extension().is_some_and(|x| x == "rk") {
+        } else if p.extension().is_some_and(|x| x == "nv") {
             out.push(p);
         }
     }
@@ -382,11 +382,11 @@ fn py_add(package: &str, module: Option<&str>) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let Some(root) = rikki::project::Project::find(&cwd) else {
-        eprintln!("error: no rikki.toml found; run: rikki new <name>");
+    let Some(root) = nevla::project::Project::find(&cwd) else {
+        eprintln!("error: no nevla.toml found; run: nevla new <name>");
         return ExitCode::FAILURE;
     };
-    let mut proj = match rikki::project::Project::load(&root) {
+    let mut proj = match nevla::project::Project::load(&root) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("error: {e}");
