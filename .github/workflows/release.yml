@@ -37,6 +37,9 @@ jobs:
           P=$(uv python find ${{ matrix.python }})
           LIBDIR=$(dirname "$P")/../lib
           TK=$(find target -type f -name tk -path '*release*' | head -1)
+          # pin the embedded stdlib to the python tk was built against;
+          # the runner has three pythons on PATH and probing is a gamble
+          export PYTHONHOME="$(python${{ matrix.python }} -c 'import sys; print(sys.base_prefix)')"
           "$TK" packaging/repair-wheel.rk dist/*.whl "$LIBDIR/libpython${{ matrix.python }}.so.1.0"
       - uses: actions/upload-artifact@v4
         with:
@@ -63,6 +66,7 @@ jobs:
           P=$(uv python find ${{ matrix.python }})
           LIBDIR=$(dirname "$P")/../lib
           TK=$(find target -type f -name tk -path '*release*' | head -1)
+          export PYTHONHOME="$("$P" -c 'import sys; print(sys.base_prefix)')"
           "$TK" packaging/repair-wheel.rk dist/*.whl "$LIBDIR/libpython${{ matrix.python }}.dylib"
       - uses: actions/upload-artifact@v4
         with:
