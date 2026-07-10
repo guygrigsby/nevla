@@ -47,8 +47,18 @@ pub fn init(venv: Option<&Path>) {
         // can already find its own home is unaffected by being handed the
         // same prefix it would have found.
         if std::env::var_os("PYTHONHOME").is_none() {
-            if let Some(home) = find_python_home(&embedded_python()) {
-                std::env::set_var("PYTHONHOME", home);
+            let ver = embedded_python();
+            match find_python_home(&ver) {
+                Some(home) => std::env::set_var("PYTHONHOME", home),
+                None => {
+                    // libpython may still self-locate (system-linked
+                    // builds), so this is a warning, not an exit; but if
+                    // interpreter startup dies below, this line is the
+                    // actionable part of the crash
+                    eprintln!(
+                        "warning: no CPython {ver} found on PATH or via uv; the py bridge needs its standard library. If startup fails below, install one: uv python install {ver}"
+                    );
+                }
             }
         }
         if let Some(v) = venv {

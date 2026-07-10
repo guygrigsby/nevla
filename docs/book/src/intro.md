@@ -21,6 +21,12 @@ rikki new hello && cd hello
 rikki run
 ```
 
+You don't need python installed first: uv fetches a managed CPython for
+the install, and the wheels carry their own libpython. The py bridge
+does need a matching CPython standard library at runtime, which the uv
+and brew installs both guarantee; a hand-rolled setup missing one gets a
+warning naming the fix (`uv python install <version>`).
+
 Two binaries, split like uv and python: `rikki` does setup (`new`,
 `py add`, `check`, `fmt`, `run`), `tk` runs code (`tk file.rk`; bare `tk`
 is the repl).
