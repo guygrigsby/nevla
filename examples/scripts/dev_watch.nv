@@ -1,0 +1,226 @@
+// dev-watch: build and run a binary, rebuild and bounce it when sources
+// change. A port of the classic shell watcher; polls mtimes every two
+// seconds, so it needs no fswatch or entr. Ctrl-C shuts down cleanly
+// (ctx.interrupt), and holding the process handle in-language replaces
+// the shell version's PID files and lock file.
+//
+// Conventions: a Makefile in the current dir exposing `make build` that
+// produces ./<dirname>. Build output and the binary's output stream to
+// the log; tail it in another pane.
+//
+// Knobs (env):
+//   BIN        path to the built binary        (default ./<dirname>)
+//   ARGS       extra launch args, space-separated
+//   WATCH      dirs/files to watch, space-separated
+//   WATCH_EXT  file suffixes to watch, space-separated
+//   LOG        log path                        (default /tmp/<dirname>.log)
+//
+//   cd ~/code/foo && nv dev_watch.nv
+//   ARGS="-addr :9000" nv dev_watch.nv
+import "ctx"
+import "file"
+import py "builtins"
+import py "glob"
+import py "os"
+import py "subprocess"
+import py "time"
+
+fn env(name str, fallback str) str {
+    v, err := str(os.environ.get(name, fallback))
+    if err != none {
+        return fallback
+    }
+    return v
+}
+
+fn sleep(secs float) {
+    _, err := time.sleep(secs)
+    if err != none {
+        return
+    }
+}
+
+fn stamp() str {
+    t, err := str(time.strftime("%H:%M:%S"))
+    if err != none {
+        return "??:??:??"
+    }
+    return t
+}
+
+
+// One line to stdout and the log; a log write failure is reported, not fatal.
+fn logline(log str, msg str) {
+    line := sprintf("[%s] %s\n", stamp(), msg)
+    printf("%s", line)
+    aerr := file.append(log, line)
+    if aerr != none {
+        printf("log write failed: %s\n", aerr.msg)
+    }
+}
+
+
+// Mtime fingerprint of everything watched; a changed, added, or removed
+// file changes the string. Build output dirs are skipped so a build does
+// not trigger the next build.
+fn signature(root str, watch []str, exts []str) str {
+    sig := ""
+    for _, w := range watch {
+        base := root + "/" + w
+        if !file.exists(base) {
+            continue
+        }
+        for _, ext := range exts {
+            if base.ends_with(ext) {
+                m, merr := float(os.path.getmtime(base))
+                if merr == none {
+                    sig = sig + sprintf("%s %f\n", base, m)
+                }
+                continue
+            }
+            paths, gerr := []str(glob.glob(base + "/**/*" + ext, recursive: true))
+            if gerr != none {
+                continue
+            }
+            for _, p := range paths {
+                if p.contains("/node_modules/") || p.contains("/dist/") || p.contains("/embedded/") || p.contains("/.git/") {
+                    continue
+                }
+                m, merr := float(os.path.getmtime(p))
+                if merr == none {
+                    sig = sig + sprintf("%s %f\n", p, m)
+                }
+            }
+        }
+    }
+    return sig
+}
+
+fn build(root str, log str) bool {
+    logline(log, "build...")
+    r, err := subprocess.run(
+        ["make", "build"],
+        cwd: root,
+        stdout: subprocess.PIPE,
+        stderr: subprocess.STDOUT,
+        text: true,
+    )
+    if err != none {
+        logline(log, "build error: " + err.msg)
+        return false
+    }
+    out, oerr := str(r.stdout)
+    if oerr == none && out != "" {
+        aerr := file.append(log, out)
+        if aerr != none {
+            printf("log write failed: %s\n", aerr.msg)
+        }
+    }
+    rc, rerr := int(r.returncode)
+    if rerr != none || rc != 0 {
+        logline(log, "BUILD FAILED")
+        return false
+    }
+    logline(log, "build ok")
+    return true
+}
+
+
+// Callers confirm bin exists first: a (py, error?) error return would
+// need a zero py to put in the value slot, and there is no such literal.
+fn start(root str, bin str, argv []str, log str) (py, error?) {
+    cmd := []str{bin}
+    for _, a := range argv {
+        cmd = append(cmd, a)
+    }
+    lf := check builtins.open(log, "a")
+    p := check subprocess.Popen(cmd, cwd: root, stdout: lf, stderr: subprocess.STDOUT)
+    pid, piderr := int(p.pid)
+    if piderr == none {
+        logline(log, sprintf("started pid %d", pid))
+    }
+    return p, none
+}
+
+
+// Terminate politely, escalate to kill if it lingers.
+fn stop(p py, log str) {
+    _, terr := p.terminate()
+    if terr != none {
+        return  // already gone
+    }
+    _, werr := p.wait(timeout: 3.0)
+    if werr != none {
+        logline(log, "did not exit in 3s; killing")
+        _, kerr := p.kill()
+        if kerr != none {
+            logline(log, "kill failed: " + kerr.msg)
+            return
+        }
+        _, werr2 := p.wait(timeout: 3.0)
+        if werr2 != none {
+            logline(log, "unkillable pid; giving up on it")
+        }
+    }
+}
+
+fn main() (error?) {
+    root := check str(os.getcwd())
+    name := check str(os.path.basename(root))
+    bin := env("BIN", root + "/" + name)
+    log := env("LOG", "/tmp/" + name + ".log")
+    argv := []str{}
+    argstr := env("ARGS", "")
+    if argstr != "" {
+        argv = argstr.split(" ")
+    }
+    watch := env("WATCH", "server web/src web/index.html cmd pkg internal main.go").split(" ")
+    exts := env("WATCH_EXT", ".go .ts .svelte .css .html").split(" ")
+
+    if !file.exists(root + "/Makefile") && !file.exists(root + "/makefile") {
+        return error.new("no Makefile at " + root + "; dev-watch expects `make build` to work")
+    }
+
+    check file.write(log, "")
+    logline(log, "dev-watch starting for " + name + "; logs at " + log)
+    if !build(root, log) {
+        return error.new("initial build failed; see " + log)
+    }
+    if !file.exists(bin) {
+        return error.new("no binary at " + bin + "; set BIN if make names it differently")
+    }
+    p := check start(root, bin, argv, log)
+
+    c := ctx.interrupt(ctx.background())
+    last := signature(root, watch, exts)
+    logline(log, "watching (poll every 2s)")
+    for !c.done() {
+        sleep(2.0)
+        sig := signature(root, watch, exts)
+        if sig == last {
+            continue
+        }
+        sleep(0.4)  // debounce: catch save-several-files in one rebuild
+        last = signature(root, watch, exts)
+        logline(log, "change detected")
+        stop(p, log)
+        if !build(root, log) {
+            logline(log, "nothing running until the next change builds")
+            continue
+        }
+        if !file.exists(bin) {
+            logline(log, "no binary at " + bin + "; set BIN if make names it differently")
+            continue
+        }
+        np, serr := start(root, bin, argv, log)
+        if serr != none {
+            logline(log, "start failed: " + serr.msg)
+            continue
+        }
+        p = np
+    }
+
+    logline(log, "interrupted; shutting down")
+    stop(p, log)
+    return none
+}

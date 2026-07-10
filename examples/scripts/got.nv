@@ -1,0 +1,30 @@
+// got: a scratch Go playground. Makes a temp dir holding main.go and a
+// test, inits a module, opens both split in nvim. The dir prints before
+// the editor opens so the path survives after it closes.
+//   nv got.nv [name]
+import "file"
+import py "tempfile"
+import py "subprocess"
+
+fn main() (error?) {
+    name := "scratch"
+    if len(args()) > 0 {
+        name = args()[0]
+    }
+    dir := check str(tempfile.mkdtemp(prefix: "got-" + name + "."))
+
+    maingo := "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"got\")\n}\n"
+    testgo := "package main\n\nimport \"testing\"\n\nfunc TestIt(t *testing.T) {\n}\n"
+    check file.write(dir + "/main.go", maingo)
+    check file.write(dir + "/func_test.go", testgo)
+
+    // a missing go toolchain still leaves a usable scratch dir: report, go on
+    _, err := subprocess.run(["go", "mod", "init", name], cwd: dir, capture_output: true)
+    if err != none {
+        print("go mod init failed (no go toolchain?): " + err.msg)
+    }
+
+    print(dir)
+    check subprocess.run(["nvim", dir + "/main.go", dir + "/func_test.go", "-O"])
+    return none
+}

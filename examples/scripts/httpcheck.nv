@@ -1,0 +1,55 @@
+// httpcheck: probe endpoints, report status and latency, exit nonzero if
+// any probe fails (the returned error is the exit status). URLs come from
+// argv, or from a file of URLs, one per line, # comments allowed.
+//   nv httpcheck.nv https://example.com http://localhost:8080/health
+//   nv httpcheck.nv urls.txt
+import "ctx"
+import "file"
+import "http"
+import py "time"
+
+fn ms() int {
+    n, err := int(time.monotonic_ns())
+    if err != none {
+        return 0
+    }
+    return n / 1000000
+}
+
+fn main() (error?) {
+    urls := args()
+    if len(urls) == 1 && !urls[0].starts_with("http") && file.exists(urls[0]) {
+        text := check file.read(urls[0])
+        urls = []str{}
+        for _, line := range text.lines() {
+            t := line.trim()
+            if t != "" && !t.starts_with("#") {
+                urls = append(urls, t)
+            }
+        }
+    }
+    if len(urls) == 0 {
+        return error.new("usage: nv httpcheck.nv <url ... | file>")
+    }
+
+    failed := 0
+    for _, u := range urls {
+        c := ctx.timeout(ctx.background(), 10.0)
+        t0 := ms()
+        resp, err := http.get(c, u)
+        took := ms() - t0
+        if err != none {
+            printf("FAIL %s: %s\n", u, err.msg)
+            failed = failed + 1
+        } else if resp.status >= 400 {
+            printf("FAIL %s: %d in %dms\n", u, resp.status, took)
+            failed = failed + 1
+        } else {
+            printf("ok   %s: %d in %dms\n", u, resp.status, took)
+        }
+    }
+    if failed > 0 {
+        return error.new(sprintf("%d of %d probes failed", failed, len(urls)))
+    }
+    return none
+}

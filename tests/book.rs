@@ -80,3 +80,39 @@ fn book_examples_compile() {
     assert!(blocks >= 12, "docs corpus too small: {blocks}");
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
+
+#[test]
+fn example_programs_compile() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut count = 0;
+    let mut failures = vec![];
+    let mut stack = vec![root.join("examples")];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir).unwrap() {
+            let p = entry.unwrap().path();
+            if p.is_dir() {
+                stack.push(p);
+                continue;
+            }
+            if p.extension().is_none_or(|e| e != "nv") {
+                continue;
+            }
+            count += 1;
+            let name = p.strip_prefix(&root).unwrap().display().to_string();
+            let code = fs::read_to_string(&p).unwrap();
+            let prog = match nevla::parser::parse(&code) {
+                Ok(prog) => prog,
+                Err(d) => {
+                    failures.push(format!("{name}: does not parse: {d}"));
+                    continue;
+                }
+            };
+            if let Err(ds) = nevla::typecheck::check(&prog) {
+                let msgs: Vec<String> = ds.iter().map(|d| d.to_string()).collect();
+                failures.push(format!("{name}: does not typecheck:\n{}", msgs.join("\n")));
+            }
+        }
+    }
+    assert!(count >= 4, "examples corpus too small: {count}");
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
