@@ -114,7 +114,7 @@ reference.
 5. `check` needs the enclosing function (or lambda) to return `error?`;
    the checker will say so.
 6. Strings are immutable; `s[i] = ...` faults. Index yields a one-char
-   `str` by code point; slices are `s[lo:hi]`.
+   `str` per character; slices are `s[lo:hi]`.
 
 ## Builtins and stdlib
 

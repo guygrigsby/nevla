@@ -8,6 +8,7 @@ src = "src"
 git-repository-url = "https://github.com/guygrigsby/rikki"
 site-url = "/book/"
 additional-css = ["theme/rikki.css"]
+additional-js = ["theme/runnable.js"]
 preferred-dark-theme = "navy"
 
 [preprocessor.runnable]

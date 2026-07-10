@@ -106,7 +106,7 @@ anywhere else in a program is a lexical error.
 
 Identifiers and keywords are restricted to ASCII (section 4.3). Arbitrary
 Unicode may appear in string literals and comments. String indexing, slicing,
-and `len` operate on Unicode code points, not bytes (sections 7.5, 7.6, 14.4).
+and `len` operate on characters, not bytes (sections 7.5, 7.6, 14.4).
 
 ## 4. Lexical elements
 
@@ -286,7 +286,9 @@ types are identical when they have the same name.
 - `float` is an IEEE 754 64-bit binary floating point number. Float
   arithmetic follows IEEE 754: division by zero yields an infinity, `0.0/0.0`
   yields NaN, and no float arithmetic faults.
-- `str` is an immutable sequence of Unicode code points.
+- `str` is an immutable sequence of characters. A character is one
+  Unicode code point; "character" means exactly that everywhere in this
+  specification.
 
 There are no implicit conversions between any of these types, including
 between `int` and `float` (section 7.9.1).
@@ -783,7 +785,7 @@ For `a[i]`:
   Indices run from 0. An index outside `0 <= i < len(a)` is a runtime fault.
   Negative indices are not supported.
 - If `a` has type `str`, `i` must be `int` and the result is a `str` holding
-  the single code point at position `i` (positions count code points).
+  the single character at position `i` (positions count characters).
   Out of range is a runtime fault.
 - If `a` has type `map[K]V`, `i` must be assignable to `K` and the result
   is `V?`; a missing key yields `none`. Reading a map never faults.
@@ -807,7 +809,7 @@ Slice = "[" { newline } Expression ":" Expression "]" .
 ```
 
 `a[lo:hi]` slices a `[]T` (yielding `[]T`) or a `str` (yielding
-`str`, positions in code points). Both bounds are required and must be `int`.
+`str`, positions in characters). Both bounds are required and must be `int`.
 The bounds must satisfy `0 <= lo <= hi <= len(a)`; anything else is a runtime
 fault. The result is a copy of the half-open range `[lo, hi)`; `a[n:n]` is
 empty. Slicing any other type, including `py`, is a compile-time error.
@@ -965,7 +967,7 @@ Unary `-` requires `int` or `float`; unary `!` requires `bool`.
 #### 7.9.2 Comparison operators
 
 `<`, `<=`, `>`, `>=` are defined on `int` with `int`, `float` with `float`,
-and `str` with `str` (lexicographic by code point). The result is `bool`.
+and `str` with `str` (lexicographic by character number). The result is `bool`.
 All other operand combinations are compile-time errors. Because comparisons
 are left associative and yield `bool`, a chained comparison such as
 `a < b < c` parses but is rejected by the type checker.
@@ -1222,9 +1224,9 @@ Rikki has one loop keyword with three forms, as in Go:
   | `py` | iteration index `i: int` | index `i: int`, item `x: py` |
 
   An `int` operand of `n <= 0` runs zero iterations. Lists range in element
-  order, maps in insertion order. Strings range by code point: the index is
-  the code-point index (the same index `s[i]` uses, section 7.5) and the
-  character is a one-character `str`. A `py` operand may be a py chain
+  order, maps in insertion order. Strings range by character: the index is
+  the character index (the same index `s[i]` uses, section 7.5) and the
+  value is a one-character `str`. A `py` operand may be a py chain
   (ranging absorbs it); iteration calls Python's `iter()` once, then
   `__next__` per round, and StopIteration ends the loop silently. Any
   other exception, including from `iter()` itself, faults ("py range:
@@ -1740,7 +1742,7 @@ The format string uses Go-style verbs:
 
 A verb may carry a minimum width (`%5s`) and a precision (`%.2f`), both
 decimal digit sequences, in the form `%[width][.precision]verb`. Width pads
-on the left with spaces to the given count of code points (not bytes).
+on the left with spaces to the given count of characters (not bytes).
 Precision is honored by `%f`; on other verbs it is accepted and ignored.
 There is no left-align or zero-pad flag. A width or precision exceeding the
 implementation's pad limit (2^20 in the reference implementation) is
@@ -1763,7 +1765,7 @@ violation is a fault (chapter 12).
 len(x) int
 ```
 
-For `str`, the number of Unicode code points; for `list`, the element count;
+For `str`, the number of characters; for `list`, the element count;
 for `map`, the entry count. Any other argument type is a compile-time error.
 
 ### 14.5 args
@@ -1795,8 +1797,8 @@ output is streamed unbuffered, so a prompt is visible before input blocks.
 ord(c str) int
 ```
 
-The Unicode code point of `c`, which must be exactly one character
-(one code point); any other argument value is a runtime fault.
+The Unicode code point (the character's number) of `c`, which must be
+exactly one character; any other argument value is a runtime fault.
 
 ### 14.8 chr
 
@@ -1804,7 +1806,7 @@ The Unicode code point of `c`, which must be exactly one character
 chr(n int) str
 ```
 
-The one-character string for code point `n`. A value that is not a valid
+The one-character string for the Unicode code point `n`. A value that is not a valid
 Unicode scalar (negative, greater than 0x10FFFF, or a surrogate) is a
 runtime fault. `chr(ord(c)) == c` for every one-character `c`.
 
@@ -1836,47 +1838,94 @@ already copy.
 
 All receivers are unchanged; results are new values.
 
-String methods (receiver `str`):
+#### String methods
 
-| Method | Signature | Behavior |
-|--------|-----------|----------|
-| `split` | `(sep str) []str` | split on separator |
-| `trim` | `() str` | strip leading and trailing white space |
-| `upper` | `() str` | uppercase |
-| `lower` | `() str` | lowercase |
-| `contains` | `(sub str) bool` | substring test |
-| `starts_with` | `(prefix str) bool` | prefix test |
-| `ends_with` | `(suffix str) bool` | suffix test |
-| `replace` | `(from str, to str) str` | replace all occurrences |
-| `find` | `(sub str) int?` | code-point index of the first occurrence, `none` if absent |
-| `fields` | `() []str` | split on runs of white space; no empty fields |
-| `lines` | `() []str` | split on line feeds; a trailing line feed adds no empty line |
-| `trim_prefix` | `(p str) str` | remove leading `p` if present, else unchanged |
-| `trim_suffix` | `(p str) str` | remove trailing `p` if present, else unchanged |
-| `chars` | `() []str` | the characters as one-character strings |
-| `repeat` | `(n int) str` | the string tiled `n` times; negative `n` faults, as does a result exceeding the implementation's size limit (2^30 bytes in the reference implementation) |
+Receiver `str`. Positions and counts are in characters.
 
-List methods (receiver `[]T`):
+- `split(sep str) []str` — split on the separator.
+- `trim() str` — strip leading and trailing white space.
+- `upper() str`, `lower() str` — case conversion.
+- `contains(sub str) bool`, `starts_with(prefix str) bool`,
+  `ends_with(suffix str) bool` — substring, prefix, and suffix tests.
+- `replace(from str, to str) str` — replace all occurrences.
+- `find(sub str) int?` — character index of the first occurrence,
+  `none` if absent.
+- `fields() []str` — split on runs of white space; no empty fields.
+- `lines() []str` — split on line feeds; a trailing line feed adds no
+  empty line.
+- `trim_prefix(p str) str`, `trim_suffix(p str) str` — remove a leading
+  or trailing `p` if present, else unchanged.
+- `chars() []str` — the characters as one-character strings.
+- `repeat(n int) str` — the string tiled `n` times; negative `n` faults,
+  as does a result exceeding the implementation's size limit (2^30 bytes
+  in the reference implementation).
 
-| Method | Signature | Behavior |
-|--------|-----------|----------|
-| `map` | `(f fn(T) U) []U` | apply `f` to each element |
-| `filter` | `(f fn(T) bool) []T` | keep elements where `f` is true |
-| `each` | `(f fn(T))` | call `f` on each element; no result |
-| `sum` | `() T` | `T` must be `int` or `float`; sum of elements. Integer overflow faults (chapter 12). Summing an empty `[]int` yields 0; the result of summing an empty `[]float` is unspecified in v1 (the reference implementation yields a value that faults on later float use) |
-| `sorted` | `() []T` | `T` must be `int`, `float`, or `str`; a fresh ascending list |
-| `sorted_by` | `(before fn(T, T) bool) []T` | sorted copy per comparator; stable |
-| `contains` | `(v T) bool` | structural membership (section 11.2) |
-| `join` | `(sep str) str` | `T` must be `str`; concatenation with separator |
+```rikki
+fn main() {
+    s := "  the rikki book  "
+    t := s.trim()
+    print(t.upper())                  // THE RIKKI BOOK
+    print(t.split(" ").join("-"))     // the-rikki-book
+    print(t.replace("book", "spec"))  // the rikki spec
+    i := t.find("rikki")
+    if i != none {
+        print(i)                      // 4
+    }
+    print("na".repeat(2) + " batman") // nana batman
+    print(len("héllo"))               // 5: characters, not bytes
+}
+```
 
-Map methods (receiver `map[K]V`):
+#### List methods
 
-| Method | Signature | Behavior |
-|--------|-----------|----------|
-| `keys` | `() []K` | keys in insertion order |
-| `values` | `() []V` | values in insertion order |
-| `has` | `(k K) bool` | key presence |
-| `delete` | `(k K)` | removes `k` in place, Go's delete; remaining order preserved |
+Receiver `[]T`.
+
+- `map(f fn(T) U) []U` — apply `f` to each element.
+- `filter(f fn(T) bool) []T` — keep elements where `f` is true.
+- `each(f fn(T))` — call `f` on each element; no result.
+- `sum() T` — `T` must be `int` or `float`; the sum of the elements.
+  Integer overflow faults (chapter 12). Summing an empty `[]int` yields
+  0; the result of summing an empty `[]float` is unspecified in v1 (the
+  reference implementation yields a value that faults on later float
+  use).
+- `sorted() []T` — `T` must be `int`, `float`, or `str`; a fresh
+  ascending list.
+- `sorted_by(before fn(T, T) bool) []T` — a sorted copy per the
+  comparator; the sort is stable.
+- `contains(v T) bool` — structural membership (section 11.2).
+- `join(sep str) str` — `T` must be `str`; concatenation with the
+  separator.
+
+```rikki
+fn main() {
+    xs := [3, 1, 4, 1, 5]
+    print(xs.sorted())                          // [1, 1, 3, 4, 5]
+    print(xs.map(fn(x) { x * 10 }).sum())       // 140
+    print(xs.filter(fn(x) { x > 2 }))           // [3, 4, 5]
+    print(xs.contains(4))                       // true
+    print(xs.sorted_by(fn(a, b) { a > b }))     // [5, 4, 3, 1, 1]
+}
+```
+
+#### Map methods
+
+Receiver `map[K]V`. Iteration order is insertion order (section 5.3).
+
+- `keys() []K` — the keys, in insertion order.
+- `values() []V` — the values, in insertion order.
+- `has(k K) bool` — key presence.
+- `delete(k K)` — removes `k` in place, Go's delete; the remaining
+  order is preserved.
+
+```rikki
+fn main() {
+    m := map[str]int{"b": 2, "a": 1}
+    print(m.keys())      // [b, a]: insertion order, not sorted
+    print(m.has("a"))    // true
+    m.delete("b")
+    print(m.values())    // [1]
+}
+```
 
 ## 15. Standard library
 
@@ -1893,43 +1942,93 @@ fault on I/O failure.
 The constructors `error.new` and `error.wrap` require no import; they are
 part of the core language. `import "error"` remains legal and adds nothing.
 
-| Function | Signature | Behavior |
-|----------|-----------|----------|
-| `error.new` | `(msg str) error` | new error with the message; empty `pytype`, `traceback`, no cause |
-| `error.wrap` | `(cause error, msg str) error` | new error with the message and the given cause |
+- `error.new(msg str) error` — a new error with the message; empty
+  `pytype`, `traceback`, no cause, and `origin` set to the call site
+  (section 5.7).
+- `error.wrap(cause error, msg str) error` — a new error with the
+  message and the given cause; `origin` is the wrap site.
+
+```rikki
+fn fetch() (error?) {
+    return error.new("connection refused")
+}
+
+fn main() {
+    err := fetch()
+    if err != none {
+        wrapped := error.wrap(err, "startup failed")
+        print(wrapped.msg)          // startup failed
+        cause := wrapped.cause
+        if cause != none {
+            print(cause.msg)        // connection refused
+        }
+    }
+}
+```
 
 Error fields are specified in section 5.7.
 
 ### 15.2 math
 
-| Member | Signature | Behavior |
-|--------|-----------|----------|
-| `abs` | `(int) int` or `(float) float` | absolute value (polymorphic over the two numeric types); `abs(-9223372036854775808)` faults with integer overflow |
-| `min`, `max` | `(int, int) int` or `(float, float) float` | both arguments the same numeric type |
-| `sqrt` | `(float) float` | square root |
-| `cos`, `sin`, `tan` | `(float) float` | trigonometry, radians |
-| `pow` | `(float, float) float` | exponentiation |
-| `exp` | `(float) float` | e raised to the argument |
-| `ln` | `(float) float` | natural logarithm |
-| `log` | `(float, float) float` | `log(base, num)`: logarithm of `num` in `base` |
-| `floor` | `(float) int` | round down |
-| `ceil` | `(float) int` | round up |
-| `round` | `(float) int` | round half away from zero (not banker's rounding) |
-| `pi`, `e` | `float` constants | |
+- `math.abs(int) int` or `(float) float` — absolute value, polymorphic
+  over the two numeric types; `abs(-9223372036854775808)` faults with
+  integer overflow.
+- `math.min(int, int) int` / `(float, float) float`,
+  `math.max(...)` likewise — both arguments the same numeric type.
+- `math.sqrt(float) float` — square root.
+- `math.cos(float) float`, `math.sin(float) float`,
+  `math.tan(float) float` — trigonometry, radians.
+- `math.pow(base float, pow float) float` — exponentiation.
+- `math.exp(pow float) float` — e raised to the argument.
+- `math.ln(num float) float` — natural logarithm.
+- `math.log(base float, num float) float` — logarithm of `num` in
+  `base`.
+- `math.floor(float) int` — round down. `math.ceil(float) int` — round
+  up. `math.round(float) int` — round half away from zero (not banker's
+  rounding).
+- `math.pi`, `math.e` — `float` constants.
+
+```rikki
+import "math"
+
+fn main() {
+    print(math.max(2, 40) + math.abs(-2))     // 42
+    print(math.pow(2.0, 10.0))                // 1024
+    printf("%.4f\n", math.log(2.0, 1024.0))   // 10.0000
+    print(math.round(2.5))                    // 3
+    printf("%.5f\n", math.pi)                 // 3.14159
+}
+```
 
 ### 15.3 file
 
 Paths are `str`. Contents are UTF-8 `str`; there is no bytes type in v1.
 
-| Function | Signature | Behavior |
-|----------|-----------|----------|
-| `file.read` | `(path str) (str, error?)` | whole-file read; zero slot is `""` on error |
-| `file.write` | `(path str, s str) error?` | create or truncate, then write |
-| `file.append` | `(path str, s str) error?` | create if missing, append |
-| `file.exists` | `(path str) bool` | existence test; never errors |
-| `file.list` | `(dir str) ([]str, error?)` | entry names, sorted lexicographically |
-| `file.remove` | `(path str) error?` | remove a file or an empty directory |
-| `file.mkdir` | `(path str) error?` | create the directory and any missing parents |
+- `file.read(path str) (str, error?)` — whole-file read; the value slot
+  is `""` on error.
+- `file.write(path str, s str) error?` — create or truncate, then write.
+- `file.append(path str, s str) error?` — create if missing, append.
+- `file.exists(path str) bool` — existence test; never errors.
+- `file.list(dir str) ([]str, error?)` — entry names, sorted
+  lexicographically.
+- `file.remove(path str) error?` — remove a file or an empty directory.
+- `file.mkdir(path str) error?` — create the directory and any missing
+  parents.
+
+```rikki
+import "file"
+
+fn main() (error?) {
+    path := "/tmp/rikki-book-example.txt"
+    check file.write(path, "one\n")
+    check file.append(path, "two\n")
+    body := check file.read(path)
+    print(body.lines())              // [one, two]
+    print(file.exists(path))         // true
+    check file.remove(path)
+    return none
+}
+```
 
 ### 15.4 ctx
 
@@ -1938,18 +2037,34 @@ Importing `"ctx"` also brings the opaque struct type `Ctx` into scope. A
 values are handles with reference semantics (section 11.1) and cannot be
 constructed with a struct literal (section 7.2.3).
 
-| Function | Signature | Behavior |
-|----------|-----------|----------|
-| `ctx.background` | `() Ctx` | never done |
-| `ctx.timeout` | `(parent Ctx, secs float) Ctx` | deadline `secs` from now, clamped so a child deadline never exceeds its parent's; negative `secs` is treated as 0; non-finite or unrepresentably large `secs` faults |
-| `ctx.interrupt` | `(parent Ctx) Ctx` | additionally becomes done when the process receives SIGINT |
+- `ctx.background() Ctx` — never done.
+- `ctx.timeout(parent Ctx, secs float) Ctx` — deadline `secs` from now,
+  clamped so a child deadline never exceeds its parent's; negative
+  `secs` is treated as 0; non-finite or unrepresentably large `secs`
+  faults.
+- `ctx.interrupt(parent Ctx) Ctx` — additionally becomes done when the
+  process receives SIGINT.
 
 Methods on `Ctx`:
 
-| Method | Signature | Behavior |
-|--------|-----------|----------|
-| `done` | `() bool` | whether the deadline has passed or the interrupt fired |
-| `err` | `() error?` | `none` while live; `"deadline exceeded"` or `"interrupted"` when done |
+- `done() bool` — whether the deadline has passed or the interrupt
+  fired.
+- `err() error?` — `none` while live; `"deadline exceeded"` or
+  `"interrupted"` when done.
+
+```rikki
+import "ctx"
+
+fn main() {
+    c := ctx.timeout(ctx.background(), 0.0)   // already expired
+    print(c.done())                           // true
+    e := c.err()
+    if e != none {
+        print(e.msg)                          // deadline exceeded
+    }
+    print(ctx.background().done())            // false
+}
+```
 
 ### 15.6 test
 
@@ -1957,12 +2072,27 @@ Importing `"test"` provides the helpers `rikki test` is built around
 (section 17.7); each returns `error?` so it composes with `check`, and
 each failure carries an origin (section 5.7).
 
-| Function | Signature | Behavior |
-|----------|-----------|----------|
-| `test.eq` | `(any, any) error?` | `none` when the two values are structurally equal (the comparison of section 11.2's `contains`); otherwise an error naming both sides. Comparing values deeper than the implementation limit faults |
-| `test.neq` | `(any, any) error?` | the negation |
-| `test.err` | `(error?) error?` | `none` when given an error; an error when given `none` |
-| `test.skip` | `(str) error?` | an error the test runner reports as skipped rather than failed |
+- `test.eq(got, want) error?` — `none` when the two values are
+  structurally equal (the comparison of section 11.2's `contains`);
+  otherwise an error naming both sides. Comparing values deeper than the
+  implementation limit faults.
+- `test.neq(got, unwanted) error?` — the negation.
+- `test.err(e error?) error?` — `none` when given an error; an error
+  when given `none`. Asserts that something failed.
+- `test.skip(reason str) error?` — an error the test runner reports as
+  skipped rather than failed.
+
+```rikki
+import "test"
+
+fn main() {
+    print(test.eq([1, 2], [1, 2]) == none)   // true: structural
+    bad := test.eq(2, 3)
+    if bad != none {
+        print(bad.msg)                        // expected 3, got 2
+    }
+}
+```
 
 ### 15.5 http
 
@@ -1973,12 +2103,29 @@ struct Request  { method str, url str, body str, headers map[str]str }
 struct Response { status int, body str, headers map[str]str }
 ```
 
-| Function | Signature |
-|----------|-----------|
-| `http.get` | `(c Ctx, url str) (Response, error?)` |
-| `http.post` | `(c Ctx, url str, body str) (Response, error?)` |
-| `http.request` | `(c Ctx, req Request) (Response, error?)` |
-| `http.stream` | `(c Ctx, url str, body str, f fn(str)) (Response, error?)` |
+- `http.get(c Ctx, url str) (Response, error?)` — GET.
+- `http.post(c Ctx, url str, body str) (Response, error?)` — POST with
+  the given body.
+- `http.request(c Ctx, req Request) (Response, error?)` — any method,
+  with headers.
+- `http.stream(c Ctx, url str, body str, f fn(str)) (Response, error?)`
+  — POST, invoking `f` per response line as it arrives.
+
+```rikki
+import "ctx"
+import "http"
+
+fn main() (error?) {
+    c := ctx.timeout(ctx.background(), 5.0)
+    resp, err := http.get(c, "http://localhost:9/unreachable")
+    if err != none {
+        print("transport error, as expected here")
+    } else {
+        print(resp.status)
+    }
+    return none
+}
+```
 
 Behavior:
 

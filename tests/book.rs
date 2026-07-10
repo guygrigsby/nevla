@@ -22,7 +22,7 @@ fn book_examples_compile() {
             fs::read_to_string(&p).unwrap(),
         ));
     }
-    for extra in ["README.md", "docs/rikki-primer.md"] {
+    for extra in ["README.md", "docs/rikki-primer.md", "language-spec.md"] {
         sources.push((extra.to_string(), fs::read_to_string(root.join(extra)).unwrap()));
     }
     for (name, text) in &sources {
