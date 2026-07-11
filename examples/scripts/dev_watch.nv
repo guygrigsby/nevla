@@ -1,8 +1,11 @@
 // dev-watch: build and run a binary, rebuild and bounce it when sources
 // change. A port of the classic shell watcher; polls mtimes every two
-// seconds, so it needs no fswatch or entr. Ctrl-C shuts down cleanly
-// (ctx.interrupt), and holding the process handle in-language replaces
-// the shell version's PID files and lock file.
+// seconds, so it needs no fswatch or entr. Ctrl-C shuts down cleanly and
+// promptly: the poll sleep is ctx-aware, and holding the process handle
+// in-language replaces the shell version's PID files and lock file.
+//
+// Native except the process spawning, which waits for the proc module
+// (ADR 0016); subprocess and the log file handle still ride the bridge.
 //
 // Conventions: a Makefile in the current dir exposing `make build` that
 // produces ./<dirname>. Build output and the binary's output stream to
@@ -19,33 +22,29 @@
 //   ARGS="-addr :9000" nv dev_watch.nv
 import "ctx"
 import "file"
+import "os"
+import "time"
 import py "builtins"
-import py "glob"
-import py "os"
 import py "subprocess"
-import py "time"
 
 fn env(name str, fallback str) str {
-    v, err := str(os.environ.get(name, fallback))
-    if err != none {
-        return fallback
+    v := os.env(name)
+    if v != none {
+        return v
     }
-    return v
+    return fallback
 }
 
-fn sleep(secs float) {
-    _, err := time.sleep(secs)
-    if err != none {
-        return
+fn two(n int) str {
+    if n < 10 {
+        return "0" + str(n)
     }
+    return str(n)
 }
 
 fn stamp() str {
-    t, err := str(time.strftime("%H:%M:%S"))
-    if err != none {
-        return "??:??:??"
-    }
-    return t
+    p := time.parts(time.now())
+    return two(p.hour) + ":" + two(p.minute) + ":" + two(p.second)
 }
 
 
@@ -72,13 +71,13 @@ fn signature(root str, watch []str, exts []str) str {
         }
         for _, ext := range exts {
             if base.has_suffix(ext) {
-                m, merr := float(os.path.getmtime(base))
+                m, merr := file.modified(base)
                 if merr == none {
-                    sig = sig + sprintf("%s %f\n", base, m)
+                    sig = sig + sprintf("%s %d\n", base, m)
                 }
                 continue
             }
-            paths, gerr := []str(glob.glob(base + "/**/*" + ext, recursive: true))
+            paths, gerr := file.glob(base + "/**/*" + ext)
             if gerr != none {
                 continue
             }
@@ -86,9 +85,9 @@ fn signature(root str, watch []str, exts []str) str {
                 if p.contains("/node_modules/") || p.contains("/dist/") || p.contains("/embedded/") || p.contains("/.git/") {
                     continue
                 }
-                m, merr := float(os.path.getmtime(p))
+                m, merr := file.modified(p)
                 if merr == none {
-                    sig = sig + sprintf("%s %f\n", p, m)
+                    sig = sig + sprintf("%s %d\n", p, m)
                 }
             }
         }
@@ -165,8 +164,9 @@ fn stop(p py, log str) {
 }
 
 fn main() (error?) {
-    root := check str(os.getcwd())
-    name := check str(os.path.basename(root))
+    root := check os.workdir()
+    parts := root.split("/")
+    name := parts[len(parts) - 1]
     bin := env("BIN", root + "/" + name)
     log := env("LOG", "/tmp/" + name + ".log")
     argv := []str{}
@@ -195,12 +195,18 @@ fn main() (error?) {
     last := signature(root, watch, exts)
     logline(log, "watching (poll every 2s)")
     for !c.done() {
-        sleep(2.0)
+        serr := time.sleep(c, 2 * time.second)
+        if serr != none {
+            break  // interrupted mid-nap; shut down now, not in 2s
+        }
         sig := signature(root, watch, exts)
         if sig == last {
             continue
         }
-        sleep(0.4)  // debounce: catch save-several-files in one rebuild
+        derr := time.sleep(c, 400 * time.millisecond)  // debounce a multi-file save
+        if derr != none {
+            break
+        }
         last = signature(root, watch, exts)
         logline(log, "change detected")
         stop(p, log)
@@ -212,9 +218,9 @@ fn main() (error?) {
             logline(log, "no binary at " + bin + "; set BIN if make names it differently")
             continue
         }
-        np, serr := start(root, bin, argv, log)
-        if serr != none {
-            logline(log, "start failed: " + serr.msg)
+        np, serr2 := start(root, bin, argv, log)
+        if serr2 != none {
+            logline(log, "start failed: " + serr2.msg)
             continue
         }
         p = np

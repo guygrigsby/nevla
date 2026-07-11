@@ -1,16 +1,23 @@
 // httpcheck: probe endpoints, report status and latency, exit nonzero if
 // any probe fails (the returned error is the exit status). URLs come from
 // argv, or from a file of URLs, one per line, # comments allowed.
+// Fully native: no import py anywhere.
 //   nv httpcheck.nv https://example.com http://localhost:8080/health
-//   nv httpcheck.nv urls.txt
+//   nv httpcheck.nv --timeout 3 urls.txt
 import "ctx"
 import "file"
+import "flag"
 import "http"
 import "os"
 import "time"
 
 fn main() (error?) {
-    urls := os.args()
+    p := check flag.parse(os.args(), [
+        flag.value("timeout", "t", "10", "per-probe timeout, seconds"),
+    ])
+    secs := check int(flag.get(p, "timeout"))
+
+    urls := p.rest
     if len(urls) == 1 && !urls[0].has_prefix("http") && file.exists(urls[0]) {
         text := check file.read(urls[0])
         urls = []str{}
@@ -22,12 +29,12 @@ fn main() (error?) {
         }
     }
     if len(urls) == 0 {
-        return error.new("usage: nv httpcheck.nv <url ... | file>")
+        return error.new("usage: nv httpcheck.nv [--timeout secs] <url ... | file>")
     }
 
     failed := 0
     for _, u := range urls {
-        c := ctx.timeout(ctx.background(), 10 * time.second)
+        c := ctx.timeout(ctx.background(), secs * time.second)
         t0 := time.clock()
         resp, err := http.get(c, u)
         took := (time.clock() - t0) / time.millisecond
