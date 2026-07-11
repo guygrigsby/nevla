@@ -112,6 +112,9 @@ impl Checker {
                     if path == "time" {
                         self.structs.extend(crate::stdlib::time::struct_types());
                     }
+                    if path == "regex" {
+                        self.structs.extend(crate::stdlib::regex::struct_types());
+                    }
                 }
                 // file imports resolve after fns and structs are collected
             }

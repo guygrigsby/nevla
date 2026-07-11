@@ -128,6 +128,9 @@ impl<'p> Interp<'p> {
                         if path == "time" {
                             structs.extend(crate::stdlib::time::struct_exprs());
                         }
+                        if path == "regex" {
+                            structs.extend(crate::stdlib::regex::struct_exprs());
+                        }
                     }
                     if *py {
                         py_imports.push(path.clone());

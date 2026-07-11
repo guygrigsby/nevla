@@ -166,6 +166,7 @@ impl Interp<'_> {
         match recv {
             Value::Module(m) => self.module_call(&m, name, args),
             Value::Ctx(c) => crate::stdlib::ctx::method(self, &c, name),
+            Value::Re(re) => crate::stdlib::regex::method(self, &re, name, args),
             Value::List(items) => self.list_method(items, name, args),
             Value::Str(s) => self.str_method(&s, name, args),
             Value::Map(m) => {

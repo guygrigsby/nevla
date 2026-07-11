@@ -139,6 +139,10 @@ impl Checker {
                     self.diag(span, "Ctx cannot be constructed; use ctx.background()");
                     return one(Type::Struct(name.clone()));
                 }
+                if name == "Re" && matches!(self.imports.get("regex"), Some(ImportKind::Std(_))) {
+                    self.diag(span, "Re cannot be constructed; use regex.compile()");
+                    return one(Type::Struct(name.clone()));
+                }
                 let Some(def) = self.structs.get(name).cloned() else {
                     self.diag(span, format!("unknown struct: {name}"));
                     return one(Type::Unknown);
@@ -777,6 +781,28 @@ impl Checker {
                 }
                 _ => {
                     self.diag(span, format!("Ctx has no method {name}"));
+                    ExprTy::One(Type::Unknown)
+                }
+            },
+            Type::Struct(s) if s == "Re" => match name {
+                "matches" => {
+                    self.check_args(&[Type::Str], args, span);
+                    ExprTy::One(Type::Bool)
+                }
+                "find" => {
+                    self.check_args(&[Type::Str], args, span);
+                    ExprTy::One(Type::Opt(Box::new(Type::Struct("Match".into()))))
+                }
+                "find_all" => {
+                    self.check_args(&[Type::Str], args, span);
+                    ExprTy::One(Type::List(Box::new(Type::Struct("Match".into()))))
+                }
+                "replace" => {
+                    self.check_args(&[Type::Str, Type::Str], args, span);
+                    ExprTy::One(Type::Str)
+                }
+                _ => {
+                    self.diag(span, format!("Re has no method {name}"));
                     ExprTy::One(Type::Unknown)
                 }
             },

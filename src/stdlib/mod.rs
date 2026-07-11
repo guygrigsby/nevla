@@ -4,6 +4,7 @@ pub mod gpu;
 pub mod http;
 pub mod math;
 pub mod os;
+pub mod regex;
 pub mod test;
 pub mod time;
 
@@ -25,6 +26,7 @@ pub fn call(
         "test" => test::call(interp, name, args),
         "time" => time::call(interp, name, args),
         "os" => os::call(interp, name, args),
+        "regex" => regex::call(interp, name, args),
         _ => Err(interp.fault(format!("{module}.{name} is not implemented yet"))),
     }
 }

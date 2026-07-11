@@ -2312,6 +2312,56 @@ In contexts with no operating system to speak of (the browser
 playground) every `os` function reports its absence as a fault naming
 the build.
 
+### 15.10 regex
+
+Pattern matching. Importing `"regex"` also declares:
+
+```
+struct Match { text str, start int, end int, groups []str }
+```
+
+and the opaque struct type `Re`, a compiled pattern. `Re` values are
+handles with reference semantics (section 11.1) and cannot be
+constructed with a struct literal; `regex.compile` makes them.
+
+- `regex.compile(pattern str) (Re, error?)` — compile a pattern. A
+  malformed pattern is an error naming the problem.
+
+Methods on `Re`:
+
+- `matches(s str) bool` — whether the pattern matches anywhere in `s`.
+- `find(s str) Match?` — the leftmost match, or `none`.
+- `find_all(s str) []Match` — every non-overlapping match, left to
+  right; an empty list when there are none.
+- `replace(s str, repl str) str` — `s` with every match replaced.
+  `$1`, `$2`, and `$name` in `repl` substitute capture groups; `$$` is
+  a literal dollar.
+
+A `Match` is plain data: `text` is the matched text, `start` and `end`
+are character indices into the subject (half-open, so
+`s[m.start:m.end] == m.text`, section 7.6), and `groups` holds
+captures 1 through n in order, with a group that did not participate
+reading as `""`.
+
+The flavor is the RE2 family (the Rust regex crate): matching runs in
+time linear in the input, and backreferences and lookaround do not
+exist; a pattern that wants them is a compile error naming the missing
+feature. Case-insensitivity and other flags are written inline
+(`(?i)`, `(?m)`, `(?s)`). Full backtracking semantics remain available
+through the bridge (`import py "re"`).
+
+```nevla
+import "regex"
+
+fn main() (error?) {
+    re := check regex.compile("(?i)(\\w+)=(\\d+)")
+    for _, m := range re.find_all("A=1 b=22 c=x") {
+        printf("%s is %s\n", m.groups[0], m.groups[1])
+    }
+    return none
+}
+```
+
 ## 16. Modules and multi-file programs
 
 ### 16.1 File imports

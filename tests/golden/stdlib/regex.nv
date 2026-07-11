@@ -1,0 +1,51 @@
+import "regex"
+
+fn main() (error?) {
+    re := check regex.compile("(\\w+)@(\\w+)\\.dev")
+
+    print(re.matches("mail guy@grigsby.dev today"))
+    print(re.matches("no addresses here"))
+
+    m := re.find("mail guy@grigsby.dev today")
+    if m == none {
+        return error.new("expected a match")
+    }
+    print(m.text)
+    print(m.start)
+    print(m.end)
+    print(m.groups)
+
+    // character offsets compose with slicing, even past unicode
+    u := "héllo wörld@nevla.dev!"
+    um := re.find(u)
+    if um == none {
+        return error.new("expected a unicode match")
+    }
+    print(u[um.start:um.end] == um.text)
+
+    all := re.find_all("a@b.dev c@d.dev")
+    print(len(all))
+    print(all[1].text)
+
+    print(re.replace("guy@grigsby.dev", "$2/$1"))
+
+    // no match is none, and narrowing works
+    if re.find("nothing") == none {
+        print("none as promised")
+    }
+
+    // an unparticipating group reads as empty
+    opt := check regex.compile("a(b)?c")
+    om := opt.find("ac")
+    if om != none {
+        print(len(om.groups))
+        print(om.groups[0] == "")
+    }
+
+    // the flavor is honest about what it refuses
+    _, err := regex.compile("(a)\\1")
+    if err != none {
+        print(err.msg.contains("backreference"))
+    }
+    return none
+}
