@@ -14,6 +14,14 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
   zero-pads. Surfaced writing timestamps (dev_watch two() helper is
   the workaround). Flags (`0`, `-`, `+`) are one contained lexer
   change in the verb parser.
+- Re-evaluate the two-binary split (2026-07-10): maybe just `nv`. The
+  uv/python analogy motivated `nevla` (setup) + `nv` (runner), but the
+  owner cannot remember the long name and calls the language nv, the
+  verb set has grown (run/check/fmt/imports/test/new/py/repl), and one
+  binary with subcommands plus `nv file.nv` as the bare fast path may
+  serve better. Touches packaging (wheel entry points, brew), docs,
+  the shebang story, and the hook template; wants its own ADR either
+  way.
 - `defer` or an answer to it: `with` (py-only) got a keyword while
   native code has no cleanup construct; gpu leans on process-exit
   release. The audit flagged the asymmetry (2026-07-10).
