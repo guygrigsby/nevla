@@ -7,15 +7,7 @@ import "ctx"
 import "file"
 import "http"
 import "os"
-import py "time"
-
-fn ms() int {
-    n, err := int(time.monotonic_ns())
-    if err != none {
-        return 0
-    }
-    return n / 1000000
-}
+import "time"
 
 fn main() (error?) {
     urls := os.args()
@@ -35,10 +27,10 @@ fn main() (error?) {
 
     failed := 0
     for _, u := range urls {
-        c := ctx.timeout(ctx.background(), 10.0)
-        t0 := ms()
+        c := ctx.timeout(ctx.background(), 10 * time.second)
+        t0 := time.clock()
         resp, err := http.get(c, u)
-        took := ms() - t0
+        took := (time.clock() - t0) / time.millisecond
         if err != none {
             printf("FAIL %s: %s\n", u, err.msg)
             failed = failed + 1

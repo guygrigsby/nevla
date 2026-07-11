@@ -73,14 +73,14 @@ fn parent(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn timeout(interp: &Interp, p: &Value, secs: f64) -> Result<Value, Fault> {
+fn timeout(interp: &Interp, p: &Value, d: i64) -> Result<Value, Fault> {
     let (deadline, interrupted) = parent(interp, Some(p))?;
-    // from_secs_f64 panics on inf or seconds past u64::MAX, and
-    // Instant addition can overflow; both are expressible from
-    // user source (1.0 / 0.0 is inf), so both fault.
-    let out_of_range = || interp.fault("ctx.timeout: seconds out of range");
-    let d = Duration::try_from_secs_f64(secs.max(0.0)).map_err(|_| out_of_range())?;
-    let new = Instant::now().checked_add(d).ok_or_else(out_of_range)?;
+    // negative clamps to 0; any i64 nanosecond count fits a Duration,
+    // but Instant addition can still overflow on a huge deadline
+    let dur = Duration::from_nanos(d.max(0) as u64);
+    let new = Instant::now()
+        .checked_add(dur)
+        .ok_or_else(|| interp.fault("ctx.timeout: duration out of range"))?;
     let deadline = Some(deadline.map_or(new, |d| d.min(new)));
     Ok(Value::Ctx(Arc::new(CtxInner {
         deadline,
@@ -90,7 +90,7 @@ fn timeout(interp: &Interp, p: &Value, secs: f64) -> Result<Value, Fault> {
 
 /// Instant::now() traps on bare wasm; deadlines need a clock.
 #[cfg(target_arch = "wasm32")]
-fn timeout(interp: &Interp, _p: &Value, _secs: f64) -> Result<Value, Fault> {
+fn timeout(interp: &Interp, _p: &Value, _d: i64) -> Result<Value, Fault> {
     Err(interp.fault("ctx.timeout is not available in this build"))
 }
 
@@ -100,7 +100,7 @@ pub fn call(interp: &mut Interp, name: &str, args: Vec<Value>) -> Result<Value, 
             deadline: None,
             interrupted: None,
         })),
-        ("timeout", [p, Value::Float(secs)]) => timeout(interp, p, *secs)?,
+        ("timeout", [p, Value::Int(d)]) => timeout(interp, p, *d)?,
         ("interrupt", [p]) => {
             let (deadline, _) = parent(interp, Some(p))?;
             Value::Ctx(Arc::new(CtxInner {
@@ -145,7 +145,7 @@ mod tests {
         let prog = Program::default();
         let mut i = Interp::new(&prog);
         let bg = call(&mut i, "background", vec![]).unwrap_or_else(|_| panic!());
-        let t = call(&mut i, "timeout", vec![bg, Value::Float(0.0)])
+        let t = call(&mut i, "timeout", vec![bg, Value::Int(0)])
             .map_err(|f| f.msg)
             .unwrap();
         let Value::Ctx(c) = &t else { panic!() };
@@ -159,9 +159,9 @@ mod tests {
         let mut i = Interp::new(&prog);
         let bg = call(&mut i, "background", vec![]).unwrap_or_else(|_| panic!());
         let short =
-            call(&mut i, "timeout", vec![bg, Value::Float(0.0)]).unwrap_or_else(|_| panic!());
+            call(&mut i, "timeout", vec![bg, Value::Int(0)]).unwrap_or_else(|_| panic!());
         let long =
-            call(&mut i, "timeout", vec![short, Value::Float(100.0)]).unwrap_or_else(|_| panic!());
+            call(&mut i, "timeout", vec![short, Value::Int(100_000_000_000)]).unwrap_or_else(|_| panic!());
         let Value::Ctx(c) = &long else { panic!() };
         assert!(c.err().is_some(), "child deadline must clamp to parent");
     }

@@ -49,7 +49,7 @@ pub(super) fn std_member(module: &str, name: &str) -> Option<Member> {
         ("gpu", "trylock") => Member::Fn(vec![Str, Str], vec![Bool, err_opt()]),
         ("gpu", "unlock") => Member::Fn(vec![Str], vec![err_opt()]),
         ("ctx", "background") => Member::Fn(vec![], vec![ctx()]),
-        ("ctx", "timeout") => Member::Fn(vec![ctx(), Float], vec![ctx()]),
+        ("ctx", "timeout") => Member::Fn(vec![ctx(), Int], vec![ctx()]),
         ("ctx", "interrupt") => Member::Fn(vec![ctx()], vec![ctx()]),
         ("http", "get") => Member::Fn(vec![ctx(), Str], vec![resp(), err_opt()]),
         ("http", "post") => Member::Fn(vec![ctx(), Str, Str], vec![resp(), err_opt()]),

@@ -6,6 +6,7 @@
 import "http"
 import "ctx"
 import "os"
+import "time"
 import py "json"
 
 
@@ -94,7 +95,7 @@ fn main() (error?) {
             // our own state failed to encode: that is a bug, die loudly
             return error.wrap(jerr, "cannot encode chat history")
         }
-        reply, err := ask(ctx.timeout(root, 120.0), base, model, hjson)
+        reply, err := ask(ctx.timeout(root, 2 * time.minute), base, model, hjson)
         if err != none {
             // recoverable: report the chain, forget the unanswered turn,
             // keep the session alive

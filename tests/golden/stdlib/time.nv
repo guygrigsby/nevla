@@ -32,7 +32,7 @@ fn main() {
     print(time.sleep(ctx.background(), -time.second) == none)
 
     // an already-done ctx wakes the sleep immediately with its error
-    dead := ctx.timeout(ctx.background(), 0.0)
+    dead := ctx.timeout(ctx.background(), 0)
     de := time.sleep(dead, time.hour)
     if de != none {
         print(de.msg)

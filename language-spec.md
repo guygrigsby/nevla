@@ -1564,7 +1564,6 @@ The complete set of fault conditions reachable from checked programs:
 - slice bounds out of range (`lo < 0`, `hi < lo`, or `hi > len`);
 - assignment into a string index (`s[i] = v`);
 - `repeat` whose result would exceed the implementation's string size limit;
-- `ctx.timeout` with non-finite or unrepresentably large seconds;
 - calling the zero value of a function type (section 5.11);
 - exceeding the call-depth limit (chapter 18), diagnostic
   "recursion limit exceeded";
@@ -2032,10 +2031,10 @@ values are handles with reference semantics (section 11.1) and cannot be
 constructed with a struct literal (section 7.2.3).
 
 - `ctx.background() Ctx` — never done.
-- `ctx.timeout(parent Ctx, secs float) Ctx` — deadline `secs` from now,
-  clamped so a child deadline never exceeds its parent's; negative
-  `secs` is treated as 0; non-finite or unrepresentably large `secs`
-  faults.
+- `ctx.timeout(parent Ctx, d int) Ctx` — deadline `d` nanoseconds from
+  now (the one time currency, section 15.8; `30 * time.second`),
+  clamped so a child deadline never exceeds its parent's; negative `d`
+  is treated as 0.
 - `ctx.interrupt(parent Ctx) Ctx` — additionally becomes done when the
   process receives SIGINT.
 
@@ -2050,7 +2049,7 @@ Methods on `Ctx`:
 import "ctx"
 
 fn main() {
-    c := ctx.timeout(ctx.background(), 0.0)   // already expired
+    c := ctx.timeout(ctx.background(), 0)     // already expired
     print(c.done())                           // true
     e := c.err()
     if e != none {
@@ -2108,9 +2107,10 @@ struct Response { status int, body str, headers map[str]str }
 ```nevla
 import "ctx"
 import "http"
+import "time"
 
 fn main() (error?) {
-    c := ctx.timeout(ctx.background(), 5.0)
+    c := ctx.timeout(ctx.background(), 5 * time.second)
     resp, err := http.get(c, "http://localhost:9/unreachable")
     if err != none {
         print("transport error, as expected here")
