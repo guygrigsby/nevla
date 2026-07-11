@@ -1,4 +1,4 @@
-# 20. Factored imports; tidy manages the set
+# 20. Factored imports; nevla imports manages the set
 
 Status: accepted 2026-07-10
 
@@ -24,23 +24,27 @@ Go's answer, both halves:
 - The gofmt/goimports split is preserved. `nevla fmt` keeps its
   contract (AST preservation, proven by the corpus gate) and only lays
   out: two or more imports render as one factored block in source
-  order. `nevla tidy` is the tool allowed to edit: it adds missing
+  order. `nevla imports` is the tool allowed to edit: it adds missing
   stdlib imports (module receivers and stdlib-injected struct names
   such as `Parts` or `Cmd` both count as use), removes unused imports
   of every kind, sorts (plain paths, then py, alphabetical within),
   and merges the group at the first import's position, then formats.
 
-Tidy's resolution is syntactic, not scoped; a local shadowing a module
-name can fool it, and `nevla check` remains the arbiter. `import
-"error"` is never auto-managed: the error constructors need no import
-(15.1), so presence is a deliberate statement.
+Resolution is syntactic, not scoped; a local shadowing a module name
+can fool it, and `nevla check` remains the arbiter. `import "error"`
+is never auto-managed: the error constructors need no import (15.1),
+so presence is a deliberate statement. The verb is `imports`, not
+`tidy`: go mod tidy means dependency management, and that word stays
+reserved for a future `nevla tidy` over the py manifest, or for
+nothing.
 
 ## Consequences
 
 - Scripts carry one import block; the ceremony argument dies without
   losing grep or capability visibility.
-- Editors and hooks run tidy where they ran fmt; fmt stays safe to run
-  anywhere, tidy is the one that changes meaning-adjacent text.
-- The formatter's comment machinery is line-driven, so tidy on an
+- Editors and hooks run `nevla imports` where they ran fmt; fmt stays
+  safe to run anywhere, imports is the one that changes
+  meaning-adjacent text.
+- The formatter's comment machinery is line-driven, so organizing an
   import region dense with comments may reflow them (never lose them);
   the ceiling is accepted and revisits with evidence.

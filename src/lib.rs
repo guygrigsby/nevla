@@ -7,7 +7,7 @@ pub mod bridge;
 pub mod builtins;
 pub mod diag;
 mod fmt;
-pub mod tidy;
+pub mod imports;
 pub mod format;
 pub mod interp;
 pub mod lexer;

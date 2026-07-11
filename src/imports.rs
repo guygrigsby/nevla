@@ -1,14 +1,15 @@
-//! `nevla tidy`: the goimports half of formatting. fmt only lays out
-//! (its contract is AST preservation); tidy edits the import set, then
-//! renders through the formatter. It adds missing stdlib imports
+//! `nevla imports`: the goimports half of formatting. fmt only lays
+//! out (its contract is AST preservation); this edits the import set,
+//! then renders through the formatter. It adds missing stdlib imports
 //! (module receivers and stdlib-injected struct names both count as
 //! use), removes unused imports of every kind, sorts the group (plain
 //! paths, then py, alphabetical within), and merges it at the position
 //! of the first import.
 //!
 //! Resolution is syntactic, not scoped: a local variable shadowing a
-//! stdlib module name can fool it. The checker still arbitrates; tidy
-//! output that fails `nevla check` is a bug report waiting to happen.
+//! stdlib module name can fool it. The checker still arbitrates;
+//! organizer output that fails `nevla check` is a bug report waiting
+//! to happen.
 
 use std::collections::HashSet;
 
@@ -59,7 +60,7 @@ fn injected_struct_owners() -> Vec<(&'static str, Vec<String>)> {
     ]
 }
 
-/// Modules tidy may add on sight of a receiver. "error" is excluded:
+/// Modules the organizer may add on sight of a receiver. "error" is excluded:
 /// its constructors need no import (spec 15.1), so the import is never
 /// missing, and an existing one is left alone below.
 const ADDABLE: &[&str] = &[
@@ -242,7 +243,7 @@ fn binds(path: &str, py: bool) -> String {
     }
 }
 
-pub fn tidy_source(src: &str) -> Result<String, Diag> {
+pub fn organize_source(src: &str) -> Result<String, Diag> {
     let prog = crate::parser::parse(src)?;
 
     let mut usage = Usage::default();

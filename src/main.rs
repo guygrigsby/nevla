@@ -33,10 +33,10 @@ enum Cmd {
         #[arg(long)]
         check: bool,
     },
-    /// Manage imports: add missing stdlib, drop unused, sort, then fmt
-    Tidy {
+    /// Organize imports: add missing stdlib, drop unused, sort, then fmt
+    Imports {
         paths: Vec<PathBuf>,
-        /// List untidy files and exit nonzero instead of rewriting
+        /// List files needing changes and exit nonzero instead of rewriting
         #[arg(long)]
         check: bool,
     },
@@ -76,7 +76,7 @@ fn main() -> ExitCode {
         }),
         Cmd::Check { file } => with_entry(file, |f| nevla::report(nevla::check_source(f))),
         Cmd::Fmt { paths, check } => rewrite_cmd(paths, check, "fmt", nevla::format::fmt_source),
-        Cmd::Tidy { paths, check } => rewrite_cmd(paths, check, "tidy", nevla::tidy::tidy_source),
+        Cmd::Imports { paths, check } => rewrite_cmd(paths, check, "imports", nevla::imports::organize_source),
         Cmd::Test { paths, jobs } => test_cmd(paths, jobs.unwrap_or(0)),
         Cmd::Py {
             cmd: PyCmd::Add { package, module },

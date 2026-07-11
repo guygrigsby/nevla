@@ -567,7 +567,7 @@ fn main() {
 ```
 
 The one true style (17.6) renders two or more imports as one factored
-block in source order; `nevla tidy` additionally manages the set
+block in source order; `nevla imports` additionally manages the set
 itself, adding missing standard library imports, removing unused
 imports, and sorting (plain paths first, then `py`, alphabetical
 within).
@@ -2646,7 +2646,7 @@ never terminate by crashing the host process.
   `nevla new <name>` scaffolds a project; `nevla py add <pkg>` declares
   a Python dependency and syncs the environment; `nevla fmt [paths]`
   rewrites source in the canonical style (`--check` reports instead);
-  `nevla tidy [paths]` manages imports (add missing stdlib, drop
+  `nevla imports [paths]` organizes imports (add missing stdlib, drop
   unused, sort) and then formats; `nevla test [paths]` runs test
   functions (section 17.7); `nevla repl` starts the REPL.
 - `nv` is the runner: `nv file.nv` typechecks and runs the file; bare `nv`

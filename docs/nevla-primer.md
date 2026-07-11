@@ -46,7 +46,7 @@ fn main() (error?) {
 ## Syntax deltas from Go
 
 - Imports: `import "os"` alone, or the factored block
-  `import (\n    "os"\n    py "torch"\n)` for two or more; `nevla tidy`
+  `import (\n    "os"\n    py "torch"\n)` for two or more; `nevla imports`
   adds missing stdlib imports, drops unused ones, and sorts.
 - `:=` declares, `=` assigns. No `var`, no semicolons, one statement per line.
 - One loop keyword: `for { }`, `for cond { }`, `for i, v := range xs { }`.

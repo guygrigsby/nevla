@@ -790,38 +790,38 @@ fn primer_inventory_stays_generated() {
     );
 }
 
-/// tidy: unused imports drop, missing stdlib imports appear (receivers
-/// and injected struct names both count), and the block sorts.
+/// nevla imports: unused drop, missing stdlib appear (receivers and
+/// injected struct names both count), and the block sorts.
 #[test]
-fn tidy_manages_imports() {
-    let d = tempdir("tidy");
+fn imports_organizes() {
+    let d = tempdir("imports");
     let f = d.join("t.nv");
     std::fs::write(
         &f,
         "import \"http\"\nimport \"time\"\n\nfn main() {\n    p := check flag.parse(os.args(), [flag.value(\"n\", \"n\", \"1\", \"count\")])\n    print(flag.get(p, \"n\"))\n}\n",
     )
     .unwrap();
-    let out = Command::new(bin()).args(["tidy"]).arg(&f).output().unwrap();
+    let out = Command::new(bin()).args(["imports"]).arg(&f).output().unwrap();
     assert!(
         out.status.success(),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let tidied = std::fs::read_to_string(&f).unwrap();
+    let organized = std::fs::read_to_string(&f).unwrap();
     assert!(
-        tidied.starts_with("import (\n    \"flag\"\n    \"os\"\n)\n"),
-        "unexpected tidy output:\n{tidied}"
+        organized.starts_with("import (\n    \"flag\"\n    \"os\"\n)\n"),
+        "unexpected output:\n{organized}"
     );
-    assert!(!tidied.contains("http"), "unused import must drop");
-    assert!(!tidied.contains("time"), "unused import must drop");
-    // tidy --check reports without rewriting
+    assert!(!organized.contains("http"), "unused import must drop");
+    assert!(!organized.contains("time"), "unused import must drop");
+    // --check reports without rewriting
     std::fs::write(&f, "import \"http\"\n\nfn main() {\n    print(1)\n}\n").unwrap();
     let out = Command::new(bin())
-        .args(["tidy", "--check"])
+        .args(["imports", "--check"])
         .arg(&f)
         .output()
         .unwrap();
-    assert!(!out.status.success(), "untidy file must fail --check");
+    assert!(!out.status.success(), "disorganized file must fail --check");
     assert!(
         std::fs::read_to_string(&f).unwrap().contains("import \"http\""),
         "--check must not rewrite"

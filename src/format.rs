@@ -14,8 +14,8 @@ pub fn fmt_source(src: &str) -> Result<String, Diag> {
 }
 
 /// Print an (possibly edited) AST in the one true style, weaving the
-/// original source's comments and blank lines. `nevla tidy` edits the
-/// import set and renders through here.
+/// original source's comments and blank lines. `nevla imports` edits
+/// the import set and renders through here.
 pub fn fmt_program(prog: &Program, src: &str) -> Result<String, Diag> {
     let (toks, trivia) = lexer::lex_trivia(src)?;
     let mut p = Printer {
@@ -181,7 +181,7 @@ impl Printer {
 
     /// Emit one import group in source order: a single line alone, the
     /// factored block for two or more. fmt never reorders (its contract
-    /// is AST preservation); sorting is `nevla tidy`'s job, the gofmt
+    /// is AST preservation); sorting is `nevla imports`' job, the gofmt
     /// versus goimports split.
     fn import_group(&mut self, group: &[Decl]) {
         let spec = |d: &Decl| match d {
