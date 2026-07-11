@@ -5,7 +5,7 @@
 use super::*;
 
 pub(super) const STD_MODULES: &[&str] =
-    &["math", "error", "file", "ctx", "gpu", "http", "test", "time"];
+    &["math", "error", "file", "ctx", "gpu", "http", "test", "time", "os"];
 
 pub(super) enum Member {
     Fn(Vec<Type>, Vec<Type>),
@@ -59,6 +59,9 @@ pub(super) fn std_member(module: &str, name: &str) -> Option<Member> {
             vec![ctx(), Str, Str, Fn(vec![Str], vec![])],
             vec![resp(), err_opt()],
         ),
+        ("os", "workdir") | ("os", "readline") => Member::Fn(vec![], vec![Str, err_opt()]),
+        ("os", "env") => Member::Fn(vec![Str], vec![Opt(Box::new(Str))]),
+        ("os", "args") => Member::Fn(vec![], vec![List(Box::new(Str))]),
         ("time", "now") | ("time", "clock") => Member::Fn(vec![], vec![Int]),
         ("time", "sleep") => Member::Fn(vec![ctx(), Int], vec![err_opt()]),
         ("time", "parts") => Member::Fn(vec![Int], vec![Struct("Parts".into())]),

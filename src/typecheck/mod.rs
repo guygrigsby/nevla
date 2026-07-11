@@ -84,14 +84,25 @@ impl Checker {
 
     fn collect(&mut self, prog: &Program) {
         for d in &prog.decls {
-            if let Decl::Import { path, py, .. } = d {
+            if let Decl::Import { path, py, span, .. } = d {
                 if *py {
                     // a dotted import binds its top-level segment (13.1)
                     let top = path.split('.').next().unwrap_or(path);
-                    self.imports.insert(top.to_string(), ImportKind::Py);
+                    if self
+                        .imports
+                        .insert(top.to_string(), ImportKind::Py)
+                        .is_some()
+                    {
+                        self.diag(*span, format!("duplicate import name: {top}"));
+                    }
                 } else if STD_MODULES.contains(&path.as_str()) {
-                    self.imports
-                        .insert(path.clone(), ImportKind::Std(path.clone()));
+                    if self
+                        .imports
+                        .insert(path.clone(), ImportKind::Std(path.clone()))
+                        .is_some()
+                    {
+                        self.diag(*span, format!("duplicate import name: {path}"));
+                    }
                     if path == "http" {
                         self.structs.extend(crate::stdlib::http::struct_types());
                     }

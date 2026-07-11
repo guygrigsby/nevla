@@ -1,0 +1,23 @@
+import "file"
+import "os"
+
+fn main() {
+    // the working directory is a real place
+    w, werr := os.workdir()
+    print(werr == none)
+    print(len(w) > 0)
+    print(file.exists(w))
+
+    // a variable every unix host sets, and one nobody does
+    print(os.env("PATH") != none)
+    print(os.env("NEVLA_TEST_SURELY_UNSET_XK9") == none)
+
+    // narrowing does the option work
+    v := os.env("PATH")
+    if v != none {
+        print(len(v) > 0)
+    }
+
+    // no command line in an embedded run: empty, not absent
+    print(len(os.args()))
+}

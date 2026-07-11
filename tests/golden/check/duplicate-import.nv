@@ -1,0 +1,6 @@
+import "os"
+import py "os"
+
+fn main() {
+    print(os.env("HOME") != none)
+}

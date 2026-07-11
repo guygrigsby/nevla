@@ -2282,6 +2282,46 @@ In contexts with no usable clock (the browser playground) `time.now`,
 `time.clock`, `time.sleep`, and `time.parts` report their absence as a
 fault naming the build, the same contract as `ctx.timeout` (15.4).
 
+### 15.9 os
+
+The process's own surroundings. Absence is an option or an error
+value, never a sentinel.
+
+- `os.workdir() (str, error?)` — the current working directory as an
+  absolute path.
+- `os.env(name str) str?` — the environment variable's value, which
+  may be the empty string, or `none` when unset (or set to bytes that
+  are not valid unicode). There is no get-with-default; narrowing is
+  the mechanism:
+
+```nevla
+import "os"
+
+fn main() {
+    bin := "./a.out"
+    v := os.env("BIN")
+    if v != none {
+        bin = v
+    }
+    print(bin)
+}
+```
+
+- `os.args() []str` — the program's arguments: everything after the
+  source file on the command line (`nv prog.nv a b` and
+  `nevla run prog.nv a b` both yield `["a", "b"]`). In contexts with
+  no command line (tests, embedding) the list is empty.
+- `os.readline() (str, error?)` — read one line from standard input.
+  The returned string excludes the line terminator. End of input and
+  read failures are error values, not faults (`eof` on end of input).
+  A prompt is the caller's own `printf`; when a program runs through
+  the CLI runner its output is streamed unbuffered, so a prompt
+  written before `os.readline` is visible before the read blocks.
+
+In contexts with no operating system to speak of (the browser
+playground) every `os` function reports its absence as a fault naming
+the build.
+
 ## 16. Modules and multi-file programs
 
 ### 16.1 File imports
