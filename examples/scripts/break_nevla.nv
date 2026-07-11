@@ -135,10 +135,12 @@ fn fault_char() (error?) {
     return none
 }
 
-fn fault_delete_return() (error?) {
-    m := map[str]int{"a": 1}
-    x := m.delete("a")
-    print(len(x))
+// the delete-return probe retired 2026-07-10: binding m.delete's
+// result is a compile error now (it returns nothing), so the
+// checked-program-faults-later hole it demonstrated is closed
+fn fault_divide() (error?) {
+    zero := len([]int{})
+    print(1 / zero)
     return none
 }
 
@@ -157,10 +159,10 @@ fn main() (error?) {
         return fault_recursion()
     } else if mode == "char" {
         return fault_char()
-    } else if mode == "delete-return" {
-        return fault_delete_return()
+    } else if mode == "divide" {
+        return fault_divide()
     }
 
-    print("modes: index overflow recursion char delete-return")
+    print("modes: index overflow recursion char divide")
     return none
 }

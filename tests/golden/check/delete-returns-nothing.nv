@@ -1,0 +1,5 @@
+fn main() {
+    m := map[str]int{"a": 1}
+    x := m.delete("a")
+    print(len(x))
+}

@@ -195,7 +195,7 @@ impl Checker {
             }
             (Map(k, _), "delete") => {
                 self.check_args(&[(**k).clone()], args, span);
-                one(recv.clone())
+                one(Unit)
             }
             _ => {
                 self.diag(span, format!("{recv} has no method {name}"));
