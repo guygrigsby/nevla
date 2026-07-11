@@ -143,6 +143,10 @@ impl Checker {
                     self.diag(span, "Re cannot be constructed; use regex.compile()");
                     return one(Type::Struct(name.clone()));
                 }
+                if name == "Proc" && matches!(self.imports.get("proc"), Some(ImportKind::Std(_))) {
+                    self.diag(span, "Proc cannot be constructed; use proc.start()");
+                    return one(Type::Struct(name.clone()));
+                }
                 let Some(def) = self.structs.get(name).cloned() else {
                     self.diag(span, format!("unknown struct: {name}"));
                     return one(Type::Unknown);
@@ -803,6 +807,32 @@ impl Checker {
                 }
                 _ => {
                     self.diag(span, format!("Re has no method {name}"));
+                    ExprTy::One(Type::Unknown)
+                }
+            },
+            Type::Struct(s) if s == "Proc" => match name {
+                "pid" => {
+                    self.check_args(&[], args, span);
+                    ExprTy::One(Type::Int)
+                }
+                "running" => {
+                    self.check_args(&[], args, span);
+                    ExprTy::One(Type::Bool)
+                }
+                "readline" => {
+                    self.check_args(&[Type::Struct("Ctx".into())], args, span);
+                    ExprTy::Multi(vec![Type::Str, err_opt()])
+                }
+                "wait" => {
+                    self.check_args(&[Type::Struct("Ctx".into())], args, span);
+                    ExprTy::Multi(vec![Type::Int, err_opt()])
+                }
+                "stop" => {
+                    self.check_args(&[Type::Int], args, span);
+                    ExprTy::One(err_opt())
+                }
+                _ => {
+                    self.diag(span, format!("Proc has no method {name}"));
                     ExprTy::One(Type::Unknown)
                 }
             },

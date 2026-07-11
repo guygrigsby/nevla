@@ -1,0 +1,77 @@
+import "ctx"
+import "proc"
+import "time"
+
+fn main() (error?) {
+    bg := ctx.background()
+
+    // the shorthand: run to completion, capture
+    r := check proc.run(bg, ["echo", "hello from a child"])
+    print(r.status)
+    printf("%s", r.stdout)
+
+    // nonzero exit fills Result AND sets the error: both are real
+    r2, err2 := proc.run(bg, ["sh", "-c", "echo partial; exit 3"])
+    print(r2.status)
+    printf("%s", r2.stdout)
+    if err2 != none {
+        print(err2.msg)
+    }
+
+    // failing to spawn at all is just an error
+    _, err3 := proc.run(bg, ["definitely-not-a-binary-xk9"])
+    print(err3 != none)
+
+    // exec: working dir, env merge (PATH survives), stdin roundtrip
+    r4 := check proc.exec(bg, Cmd{
+        argv: ["sh", "-c", "cat; basename $(pwd); echo $NEVLA_PROBE; echo $PATH | head -c 1"],
+        dir: "/tmp",
+        env: map[str]str{"NEVLA_PROBE": "merged"},
+        stdin: "from stdin\n",
+        log: "",
+    })
+    printf("%s", r4.stdout)
+    print("")
+
+    // a long-running child: readline until eof, then wait
+    p := check proc.start(Cmd{
+        argv: ["sh", "-c", "echo one; echo two 1>&2; echo three"],
+        dir: "", env: map[str]str{}, stdin: "", log: "",
+    })
+    print(p.pid() > 0)
+    n := 0
+    for {
+        _, rerr := p.readline(bg)
+        if rerr != none {
+            print("stream ended: " + rerr.msg)
+            break
+        }
+        n = n + 1
+    }
+    print(n)
+    status := check p.wait(bg)
+    print(status)
+    print(p.running())
+
+    // stop terminates a sleeper promptly and is idempotent
+    sleeper := check proc.start(Cmd{
+        argv: ["sleep", "30"],
+        dir: "", env: map[str]str{}, stdin: "", log: "",
+    })
+    print(sleeper.running())
+    t0 := time.clock()
+    check sleeper.stop(2 * time.second)
+    print((time.clock() - t0) < 2 * time.second)
+    print(sleeper.running())
+    check sleeper.stop(time.second)
+
+    // a deadline kills a run mid-sleep, promptly, with the ctx error
+    t1 := time.clock()
+    r5, derr := proc.run(ctx.timeout(bg, 200 * time.millisecond), ["sleep", "30"])
+    print((time.clock() - t1) < 10 * time.second)
+    print(r5.status)
+    if derr != none {
+        print(derr.msg)
+    }
+    return none
+}

@@ -1,0 +1,21 @@
+0
+hello from a child
+3
+partial
+exit status 3
+true
+from stdin
+tmp
+merged
+/
+true
+stream ended: eof
+3
+0
+false
+true
+true
+false
+true
+-1
+deadline exceeded

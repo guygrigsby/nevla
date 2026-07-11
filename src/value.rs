@@ -50,6 +50,7 @@ pub enum Value {
     /// like py values; it is a handle, not data.
     Ctx(std::sync::Arc<crate::stdlib::ctx::CtxInner>),
     Re(std::sync::Arc<regex::Regex>),
+    Proc(std::sync::Arc<crate::stdlib::proc::ProcInner>),
     Tuple(Vec<Value>),
     Unit,
 }
@@ -205,6 +206,7 @@ impl Value {
             | Value::Module(_)
             | Value::Ctx(_)
             | Value::Re(_)
+            | Value::Proc(_)
             | Value::Unit => false,
         })
     }
@@ -268,6 +270,7 @@ fn render_depth(v: &Value, depth: u32) -> String {
         Value::Module(m) => format!("module {m}"),
         Value::Ctx(_) => "ctx".into(),
         Value::Re(re) => format!("re({})", re.as_str()),
+        Value::Proc(_) => "proc".into(),
         Value::Tuple(items) => items.iter().map(r).collect::<Vec<_>>().join(", "),
         Value::Unit => "()".into(),
     }

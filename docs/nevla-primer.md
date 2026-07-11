@@ -135,6 +135,7 @@ Modules (plain `import "name"`, spec chapter 15):
 - `os`: args, env, readline, workdir
 - `regex`: compile
 - `flag`: get, parse, toggle, value
+- `proc`: exec, run, start
 <!-- END GENERATED -->
 
 The nuance the names alone don't carry: `clone` is a one-level copy;

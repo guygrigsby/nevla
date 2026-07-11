@@ -2421,6 +2421,85 @@ fn main() (error?) {
 }
 ```
 
+### 15.12 proc
+
+Subprocesses. Importing `"proc"` also declares:
+
+```
+struct Cmd { argv []str, dir str, env map[str]str, stdin str, log str }
+struct Result { status int, stdout str, stderr str }
+```
+
+and the opaque struct type `Proc`, a handle to a started child, with
+reference semantics (section 11.1); `proc.start` makes them.
+
+- `proc.run(c Ctx, argv []str) (Result, error?)` — run to completion
+  and capture output. Shorthand for `proc.exec` with an empty `Cmd`
+  around `argv`.
+- `proc.exec(c Ctx, cmd Cmd) (Result, error?)` — the full form.
+  `cmd.dir` sets the working directory (`""` inherits); `cmd.env`
+  entries are ADDED to the inherited environment, overriding on
+  collision (an empty map inherits unchanged; there is no way to drop
+  the inherited environment in v1); a non-empty `cmd.stdin` is written
+  to the child and closed.
+- `proc.start(cmd Cmd) (Proc, error?)` — start a long-running child.
+  Its stderr merges into stdout as one stream, interleaved at line
+  granularity in arrival order. A non-empty `cmd.log` appends the
+  stream to that file instead; `readline` on a logged child returns an
+  error naming the file.
+
+Exit semantics for `run`/`exec`: a child that ran and exited zero is a
+`Result` with a `none` error. A nonzero exit fills `Result` AND sets
+the error (`exit status 3`): handling stays mandatory, the output stays
+data. A child terminated by a signal reports `status` -1 and the error
+names the signal. Failure to spawn at all (missing binary, bad
+directory) returns the zero `Result` and an error. If the ctx is
+already done, nothing spawns. If the ctx ends while the child runs,
+the child is terminated (then killed after a short grace) and the call
+returns the ctx error with output captured so far and `status` -1.
+
+Methods on `Proc`:
+
+- `pid() int` — the child's process id.
+- `running() bool` — whether the child is still alive.
+- `readline(c Ctx) (str, error?)` — the next line of the merged
+  stream, blocking until one arrives, the stream ends (`eof`, the
+  `os.readline` contract), or the ctx ends (the ctx error; the child
+  is left alone).
+- `wait(c Ctx) (int, error?)` — block until the child exits and return
+  its status, or return the ctx error when the ctx ends first (the
+  handle stays valid; waiting again is fine).
+- `stop(grace int) error?` — terminate politely, wait `grace`
+  nanoseconds, kill. Idempotent; stopping an exited child is `none`.
+
+The runtime owns the pipes: child output is moved into buffers (or the
+log file) by the implementation the moment it exists, so a child that
+fills one pipe while the program reads another cannot deadlock. No
+part of a program observes the threads this implies.
+
+```nevla
+import "ctx"
+import "proc"
+import "time"
+
+fn main() (error?) {
+    c := ctx.timeout(ctx.background(), 30 * time.second)
+    r := check proc.run(c, ["git", "status", "--short"])
+    printf("%s", r.stdout)
+
+    p := check proc.start(Cmd{
+        argv: ["make", "serve"],
+        dir: "", env: map[str]str{}, stdin: "", log: "/tmp/serve.log",
+    })
+    printf("serving as pid %d\n", p.pid())
+    check p.stop(2 * time.second)
+    return none
+}
+```
+
+In contexts with no processes (the browser playground) every `proc`
+function reports its absence as a fault naming the build.
+
 ## 16. Modules and multi-file programs
 
 ### 16.1 File imports

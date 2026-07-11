@@ -134,6 +134,9 @@ impl<'p> Interp<'p> {
                         if path == "flag" {
                             structs.extend(crate::stdlib::flag::struct_exprs());
                         }
+                        if path == "proc" {
+                            structs.extend(crate::stdlib::proc::struct_exprs());
+                        }
                     }
                     if *py {
                         py_imports.push(path.clone());

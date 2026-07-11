@@ -44,6 +44,12 @@ drafts that are not yet decisions and may never become one.
   ctx end. Sleep is already a select of deadline vs cancellation; a
   select primitive would generalize it.
 
+- 2026-07-10, proc landed (spec 15.12): the pump threads exist as
+  designed; only Strings cross them (Mutex<VecDeque<String>> plus a
+  Condvar). run/exec/wait/readline all slice-poll (~20ms) against the
+  ctx, the time.sleep pattern; three call sites now share that shape,
+  which is the evidence a select/park primitive would consolidate.
+
 ## Users waiting on this (evidence of demand)
 
 - 2026-07-10, dev-watch example: wants to watch the filesystem, pump a
