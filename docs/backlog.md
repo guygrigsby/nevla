@@ -5,7 +5,18 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
 ## v1.1
 
 - `bytes` type. Unblocks binary file and http bodies. Touches literals,
-  indexing, conversions.
+  indexing, conversions. ADR 0019 records the character model it
+  complements.
+- proc module (ADR 0016, accepted 2026-07-10): subprocesses with
+  runtime-pumped pipes. The last blocker for fully native scripts;
+  dev-watch and got still ride subprocess through the bridge.
+- printf zero-padding: `%02d` parses as width 2 and space-pads; Go
+  zero-pads. Surfaced writing timestamps (dev_watch two() helper is
+  the workaround). Flags (`0`, `-`, `+`) are one contained lexer
+  change in the verb parser.
+- `defer` or an answer to it: `with` (py-only) got a keyword while
+  native code has no cleanup construct; gpu leans on process-exit
+  release. The audit flagged the asymmetry (2026-07-10).
 - `nevla fmt`: DONE 2026-07-09 (design:
   docs/specs/2026-07-09-fmt-design.md). Corpus-proven lossless (AST and
   comments preserved, idempotent over every golden); `nevla fmt --check`
