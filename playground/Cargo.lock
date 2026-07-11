@@ -419,6 +419,7 @@ dependencies = [
  "indexmap",
  "libc",
  "pyo3",
+ "pyo3-build-config",
  "regex",
  "toml",
  "ureq",

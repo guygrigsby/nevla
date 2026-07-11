@@ -19,6 +19,12 @@ libc = "0.2"
 # native-only: the py bridge, http, SIGINT handling, and local civil time
 # have no wasm story; the playground build stubs them (src/bridge_wasm.rs,
 # cfg gates)
+# build.rs stamps the linked CPython's major.minor at compile time
+# (bridge::embedded_python); the runtime Py_GetVersion call it replaces
+# came back empty on 2026-07-10 GitHub runners
+[build-dependencies]
+pyo3-build-config = "0.29"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 ctrlc = "3.5.2"

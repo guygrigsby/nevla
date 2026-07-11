@@ -189,16 +189,12 @@ pub fn py_none() -> PyHandle {
     Python::attach(|py| PyHandle::new(py.None()))
 }
 
-/// "major.minor" of the linked CPython, readable before initialization.
+/// "major.minor" of the linked CPython, stamped at build time
+/// (build.rs via pyo3-build-config). No FFI, no initialization order:
+/// the runtime Py_GetVersion call this replaces returned an empty
+/// string on 2026-07-10 GitHub runners.
 pub fn embedded_python() -> String {
-    let raw = unsafe { std::ffi::CStr::from_ptr(pyo3::ffi::Py_GetVersion()) };
-    let s = raw.to_string_lossy();
-    let ver = s.split_whitespace().next().unwrap_or("");
-    let mut it = ver.split('.');
-    match (it.next(), it.next()) {
-        (Some(maj), Some(min)) => format!("{maj}.{min}"),
-        _ => ver.to_string(),
-    }
+    env!("NEVLA_EMBEDDED_PY").to_string()
 }
 
 pub fn import(name: &str) -> Result<PyHandle, ErrVal> {
