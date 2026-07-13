@@ -74,9 +74,5 @@ The gate is `NEVLA_TEST_PY=1 cargo test`, green before every commit (the py gold
 
 ## The name
 
-Nevla (नेवला) is Hindi for mongoose. The project was briefly named for
-Kipling's Rikki-Tikki-Tavi and renamed once the story's colonial
-subtext was pointed at directly; [ADR 0014](docs/adr/0014-rename-to-nevla.md)
-and [the book's mascot page](docs/book/src/mascot.md) give the full
-account. Same purple mongoose: the animal was never the
-problem.
+Nevla (नेवला) is Hindi for mongoose. The project was briefly named
+rikki; [ADR 0014](docs/adr/0014-rename-to-nevla.md) records the rename.
