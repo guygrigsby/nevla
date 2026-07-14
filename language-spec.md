@@ -1768,6 +1768,20 @@ A Python exception becomes an error value with:
 
 ### 13.5 Conversions across the bridge
 
+Data crosses the bridge by one rule per kind:
+
+- **Value types** (scalars, `str`, structs): convert, i.e. copy. A value has
+  no identity to preserve, so the copy is lossless.
+- **Contiguous primitive buffers** (`[]byte`; the compact numeric list types
+  `[]float64`/`[]int64` inherit this design if they arrive): cross *by
+  reference*, zero-copy, through CPython's buffer protocol. This is the data
+  plane.
+- **Structured containers** (lists other than `[]byte`, maps): copy, per
+  element, into a fresh Python `list`/`dict`. CPython cannot view foreign
+  memory as a `list`.
+- **`py` handles**: already references; the referenced object crosses
+  unchanged.
+
 Inbound (nevla value passed as an argument or index to a Python
 operation): conversion is automatic, per this table, applied recursively to
 list elements and map entries:
@@ -1780,22 +1794,28 @@ list elements and map entries:
 | `bool` | `bool` |
 | `str` | `str` |
 | `none` | `None` |
-| `[]T` | `list` |
+| `[]byte` | a buffer-protocol view (`nevla.bytesview`), zero-copy; see below |
+| `[]T` (`T` ≠ `byte`) | `list` (a per-element copy) |
 | `map[K]V` | `dict` |
 | `py` | the referenced object itself |
+
+A `[]byte` argument crosses as `nevla.bytesview`, a bridge-defined object
+exposing the buffer's memory (pointer and length) through CPython's buffer
+protocol. `memoryview`, `hashlib.update`, `numpy.frombuffer`,
+`torch.frombuffer`, and `file.write` consume it with no copy at any size,
+with no size threshold and no opt-in. The view shares the buffer's memory,
+so mutations are visible both ways: a nevla `b[i] = x` changes what a
+`frombuffer` tensor sees, and a Python in-place write changes what nevla
+reads. nevla is single-threaded and the GIL serializes Python, so there is
+no torn access. The view is not a Python `bytes`; code that requires a true
+`bytes` (an `isinstance(x, bytes)` check, a `dict` key, `.decode()`) calls
+`bytes(x)` py-side, the one explicit copy, paid at the call site that
+demands it.
 
 Passing any other type (a struct, function, error, Ctx, or module) is not a
 conversion error at compile time but produces an error value at runtime
 ("cannot pass ... to python"), flowing through the chain's error slot like
 any Python exception.
-
-`[]byte` is a temporary exception to the `[]T` row above: its compact
-buffer representation (section 11.1) does not yet have a bridge crossing
-defined, so passing a `[]byte` value to a py operation produces the
-"cannot pass ... to python" error value like any unsupported type, not a
-Python `list`. This is a placeholder pending the zero-copy buffer-protocol
-view design 2026-07-13 specifies (a later revision of this section);
-tracked in the implementation plan, not a permanent language rule.
 
 Outbound (Python object to nevla value): always explicit and fallible,
 via the conversions of section 7.7 applied to a `py` operand. Each yields

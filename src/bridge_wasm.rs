@@ -107,3 +107,6 @@ pub fn display(_h: &PyHandle) -> String {
 pub fn is_stdlib(_name: &str) -> bool {
     false
 }
+
+/// No Python, nothing deferred: nothing to flush.
+pub fn release_pending() {}

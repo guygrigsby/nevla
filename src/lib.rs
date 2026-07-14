@@ -382,6 +382,11 @@ fn check_then_run(prog: &ast::Program, mode: Mode, args: Vec<String>, out: Outpu
     }
     let result = interp.run_main();
     let stdout = interp.take_out();
+    // Drop the interpreter's values here, then flush any py decrefs they
+    // deferred, so an escaped `bytesview` (unsendable pyclass) is released on
+    // this thread rather than a later run's. `result` carries no py handles.
+    drop(interp);
+    bridge::release_pending();
     match result {
         Ok(None) => RunResult {
             stdout,

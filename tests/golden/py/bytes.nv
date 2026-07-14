@@ -1,0 +1,29 @@
+import py "hashlib"
+import py "builtins"
+
+fn main() (error?) {
+    b := []byte("hello world")
+
+    // whole-buffer digest: the []byte crosses as a zero-copy buffer view
+    whole := check hashlib.sha256(b)
+    print(check str(check whole.hexdigest()))
+
+    // chunked digest over two slices: each slice crosses as its own view;
+    // the running hash equals the whole-buffer hash
+    chunked := check hashlib.sha256()
+    check chunked.update(b[0:5])
+    check chunked.update(b[5:11])
+    print(check str(check chunked.hexdigest()))
+
+    // a held memoryview shares the buffer's memory: a nevla write is visible
+    held := check builtins.memoryview(b)
+    b[0] = 72
+    print(check int(held[0]))            // 72
+
+    // append copies (ADR 0022): b2 is a new buffer, so mutating it leaves
+    // the buffer the view still points at untouched
+    b2 := append(b, 33)
+    b2[0] = 90
+    print(check int(held[0]))            // 72 still
+    return none
+}

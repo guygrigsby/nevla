@@ -372,6 +372,78 @@ pub fn to_py_handle(v: &Value) -> Result<PyHandle, ErrVal> {
     Python::attach(|py| to_py(py, v).map(PyHandle::new))
 }
 
+/// A nevla `[]byte` crossing the bridge: a buffer-protocol view over the
+/// buffer's memory (design 2026-07-13). Zero-copy at any size; `memoryview`,
+/// `hashlib.update`, `numpy.frombuffer`, `torch.frombuffer`, and
+/// `file.write` consume it without a copy.
+///
+/// Safety invariant: the data pointer handed to CPython stays valid for the
+/// life of the view. Nothing reallocates a live buffer — index-assign
+/// (`b[i] = x`) writes in place and `append` always copies (ADR 0022), so a
+/// buffer's address is stable from allocation to death. The `Rc` clone this
+/// holds pins the allocation, and `PyBuffer_FillInfo` stores a new reference
+/// to this pyclass in `view->obj`, so the consumer keeps the pyclass (hence
+/// the `Rc`, hence the `Vec`) alive as long as it holds the view. nevla is
+/// single-threaded and the GIL serializes Python, so there is no torn
+/// access. `unsendable`: `BytesRef` is an `Rc`.
+#[pyclass(unsendable, name = "bytesview", module = "nevla")]
+struct BytesView {
+    buf: crate::value::BytesRef,
+}
+
+#[pymethods]
+impl BytesView {
+    /// # Safety
+    /// `view` is a CPython-owned `Py_buffer` (or null); the caller owns it.
+    unsafe fn __getbuffer__(
+        slf: Bound<'_, Self>,
+        view: *mut pyo3::ffi::Py_buffer,
+        flags: std::os::raw::c_int,
+    ) -> PyResult<()> {
+        if view.is_null() {
+            return Err(pyo3::exceptions::PyBufferError::new_err("view is null"));
+        }
+        // Take the pointer and length under a short borrow; the RefCell
+        // borrow ends before the FFI fill. The pointer stays valid after
+        // the borrow drops: the borrow is only a runtime check, and the Rc
+        // owns the Vec (see the safety invariant above).
+        let (ptr, len) = {
+            let this = slf.borrow();
+            let buf = this.buf.borrow();
+            (
+                buf.data.as_ptr() as *mut std::os::raw::c_void,
+                buf.data.len() as pyo3::ffi::Py_ssize_t,
+            )
+        };
+        // readonly = 0: the view is writable, so mutations are visible both
+        // ways and a consumer requesting PyBUF_WRITABLE is satisfied (with
+        // readonly = 1, FillInfo rejects such a request with BufferError).
+        // FillInfo fills format "B", itemsize 1, ndim 1, and shape/strides
+        // per `flags`, and stores a new reference to this pyclass in
+        // view->obj, pinning it for the buffer's lifetime.
+        let ret = unsafe {
+            pyo3::ffi::PyBuffer_FillInfo(view, slf.as_ptr(), ptr, len, 0, flags)
+        };
+        if ret == 0 {
+            Ok(())
+        } else {
+            // Only reachable if a read-only buffer were asked for writable,
+            // which cannot happen here; convert whatever exception CPython
+            // set rather than fault.
+            Err(PyErr::fetch(slf.py()))
+        }
+    }
+
+    /// # Safety
+    /// `view` is the `Py_buffer` filled by `__getbuffer__`.
+    ///
+    /// No exporter-owned resources to free: `PyBuffer_FillInfo` points
+    /// `format` at a static `"B"` and allocates nothing. The consumer's
+    /// `PyBuffer_Release` drops the `view->obj` reference, releasing this
+    /// pyclass and its `Rc`.
+    unsafe fn __releasebuffer__(&self, _view: *mut pyo3::ffi::Py_buffer) {}
+}
+
 fn to_py_depth(py: Python<'_>, v: &Value, depth: u32) -> Result<Py<PyAny>, ErrVal> {
     if depth > DEPTH_LIMIT {
         return Err(ErrVal {
@@ -398,6 +470,9 @@ fn to_py_depth(py: Python<'_>, v: &Value, depth: u32) -> Result<Py<PyAny>, ErrVa
                 .into_any()
                 .unbind()
         }
+        Value::Bytes(buf) => Py::new(py, BytesView { buf: buf.clone() })
+            .map_err(|e| errval(py, e))?
+            .into_any(),
         Value::Map(m) => {
             let d = PyDict::new(py);
             for (k, val) in m.borrow().iter() {
@@ -495,6 +570,21 @@ pub fn display(h: &PyHandle) -> String {
     })
 }
 
+/// Flush Python decrefs that pyo3 deferred while this thread was detached.
+/// A `Py<T>` dropped without the GIL held (every py value released as a
+/// nevla scope unwinds) queues its decref for the next `attach`, which may
+/// land on a later run's thread. For ordinary py objects that is harmless,
+/// but a `bytesview` is an `unsendable` pyclass holding an `Rc`: dropping it
+/// on a foreign thread trips pyo3's thread-affinity guard. Calling this on
+/// the interpreter thread once the run's values are dropped forces the
+/// queued decrefs (hence any escaped `bytesview`) to run here, on the thread
+/// that created them. No-op when Python was never initialized.
+pub fn release_pending() {
+    if INIT.is_completed() {
+        Python::attach(|_| {});
+    }
+}
+
 /// Is `name` a Python standard-library module? Used by the manifest check:
 /// stdlib imports need no declaration in nevla.toml.
 pub fn is_stdlib(name: &str) -> bool {
@@ -540,6 +630,38 @@ mod tests {
         .unwrap();
         let Value::Py(r) = out else { panic!("{out:?}") };
         assert_eq!(display(&r), "42");
+    }
+
+    // []byte crosses as a zero-copy buffer view: a held memoryview shares
+    // the buffer's memory (a rust-side write is visible py-side), and
+    // bytes(view) materializes an equal, independent copy.
+    #[test]
+    fn bytes_cross_as_zero_copy_view() {
+        init(None);
+        let bref = std::rc::Rc::new(std::cell::RefCell::new(crate::value::BytesBuf {
+            data: vec![1, 2, 3],
+        }));
+        let val = Value::Bytes(bref.clone());
+        Python::attach(|py| {
+            let view = to_py(py, &val).unwrap();
+            let bound = view.bind(py);
+            let builtins = py.import("builtins").unwrap();
+
+            // (a) the buffer's length crosses: memoryview over the view is 3
+            let held = builtins.call_method1("memoryview", (&bound,)).unwrap();
+            assert_eq!(held.len().unwrap(), 3);
+
+            // (b) shared memory: write data[0] through the BytesRef from rust,
+            // the held memoryview sees it (not a copy)
+            bref.borrow_mut().data[0] = 9;
+            let first: u8 = held.get_item(0).unwrap().extract().unwrap();
+            assert_eq!(first, 9, "memoryview must share the buffer's memory");
+
+            // (c) bytes(view) materializes an equal copy py-side
+            let copy = builtins.call_method1("bytes", (&bound,)).unwrap();
+            let bytes: Vec<u8> = copy.extract().unwrap();
+            assert_eq!(bytes, vec![9, 2, 3]);
+        });
     }
 
     #[test]
