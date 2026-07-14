@@ -1,0 +1,6 @@
+fn main() {
+    b := byte(0)
+    if b == 300 {
+        print("no")
+    }
+}

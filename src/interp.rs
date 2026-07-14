@@ -1248,6 +1248,15 @@ impl<'p> Interp<'p> {
             (LtEq, Byte(a), Byte(b)) => Bool(a <= b),
             (Gt, Byte(a), Byte(b)) => Bool(a > b),
             (GtEq, Byte(a), Byte(b)) => Bool(a >= b),
+            // Same widening as the Eq/NotEq arms above, for the ordered
+            // comparisons: required so a checker-approved (Byte, Int) pair
+            // (an in-range literal on one side, spec 5.10) compares
+            // correctly at runtime. Constraint: this path is also reachable
+            // unchecked from the repl, where it permits comparing a byte
+            // variable against an arbitrary int variable with no static
+            // check at all. Accepted looseness, not silent — tracked under
+            // the "Repl typechecking (currently unchecked)" backlog item
+            // (docs/backlog.md); close this note when repl checking lands.
             (Lt, Byte(a), Int(b)) => Bool((*a as i64) < *b),
             (Lt, Int(a), Byte(b)) => Bool(*a < (*b as i64)),
             (LtEq, Byte(a), Int(b)) => Bool((*a as i64) <= *b),

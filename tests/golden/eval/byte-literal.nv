@@ -10,6 +10,8 @@ fn main() {
     print(int(b))              // 200
     print(b == 200)            // true
     print(b < 255)             // true
+    print(200 == b)            // true
+    print(255 > b)             // true
     h := Header{kind: 3}
     print(int(h.kind))         // 3
     print(int(take(9)))        // 9

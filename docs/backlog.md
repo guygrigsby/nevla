@@ -69,7 +69,10 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
 - Source snippets in diagnostics (decided 2026-07-09): show the offending
   source line with a caret under file:line:col. Humans and the playground
   see it immediately; the agent hook feedback gets richer for free.
-- Repl typechecking (currently unchecked).
+- Repl typechecking (currently unchecked): byte/int comparisons compare
+  numerically rather than by declared type in the repl (2026-07-14, task 2
+  review), same as the checked path's literal implicit but with no range or
+  type check at all. Close this note when repl checking lands.
 - Graceful bridge startup (2026-07-09): a missing CPython stdlib at py
   init is a fatal abort today (with an actionable warning printed above
   it since 0.1.13). Full fix is PyConfig-based init through the ffi,
