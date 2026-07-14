@@ -1891,12 +1891,15 @@ value must be assignable to its element type. Zero values yield a plain
 copy. The original list is never modified; other names bound to it see
 growth only through rebinding (chapter 11).
 
-`append` on `[]byte` observes the same contract: `xs` is never modified in
-place from the caller's perspective, and growth is visible only by
-rebinding. The reference implementation grows a buffer with no other
-outstanding reference in place as an allocation optimization (amortized
-O(1) for build-by-append loops); this is unobservable from nevla source
-and is not part of the language's semantics.
+`append` on `[]byte` observes the same contract: every call returns a fresh
+buffer, and `xs` is never modified in place from the caller's perspective.
+An earlier reference-count-based in-place growth optimization was removed
+(design 2026-07-14) after it broke exactly this contract: no refcount
+threshold can distinguish `xs = append(xs, v)` (safe to reuse storage, since
+`xs` immediately rebinds to the result) from `ys := append(xs, v)` (`xs`
+must stay unchanged) without move semantics or escape analysis, which the
+reference implementation has neither of. `[]byte` append now always copies,
+exactly like every other `[]T`.
 
 ### 14.8 clone
 

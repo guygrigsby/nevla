@@ -1,0 +1,43 @@
+// Regression coverage for the Task 3 fix round: []byte values whose
+// elements carry a mix of Value::Byte and Value::Int runtime tags (the
+// compact buffer's boxed-list escape hatches: sorted_by's return, a bare
+// untyped list literal in a []byte-expected position, an untyped literal
+// struct field) must behave exactly like an all-Value::Byte buffer.
+
+struct Header {
+    kind byte
+}
+
+fn takesBytes(b []byte) bool {
+    return b.contains(byte(1))
+}
+
+fn main() {
+    // sorted_by returns []byte too; the result must repack into the
+    // compact form so a later append/contains sees byte-tagged elements,
+    // not a boxed list holding a stray Value::Int from the append.
+    b := []byte{3, 1, 2}
+    c := b.sorted_by(fn(x, y byte) bool { return x > y })
+    d := append(c, 9)
+    print(d.contains(byte(9)))       // true
+
+    // a bare untyped list literal passed where []byte is expected stays a
+    // boxed list of Value::Int; contains' needle (byte(1), Value::Byte)
+    // must still cross-compare against those Value::Int elements.
+    print(takesBytes([1, 2]))        // true
+
+    // a struct literal field typed byte keeps a bare int literal as
+    // Value::Int (no field-type coercion at the literal site); comparing
+    // against a struct built with an explicit byte(3) conversion must
+    // still find the two structurally equal.
+    hs := [Header{kind: 3}]
+    print(hs.contains(Header{kind: byte(3)}))   // true
+
+    // append stays pure for []byte exactly as for every other []T: binding
+    // the result to a new name must never mutate the name still bound to
+    // the original buffer.
+    e := []byte{1, 2}
+    f := append(e, 3)
+    print(e)                         // [1, 2]
+    print(f)                         // [1, 2, 3]
+}

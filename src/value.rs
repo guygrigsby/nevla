@@ -15,10 +15,6 @@ pub type MapRef = Rc<RefCell<IndexMap<MapKey, Value>>>;
 #[derive(Debug)]
 pub struct BytesBuf {
     pub data: Vec<u8>,
-    /// Set on first bridge crossing (Task 7); a lent buffer never grows in
-    /// place again, keeping its address stable for as long as Python holds
-    /// a view. Never cleared.
-    pub lent: bool,
 }
 pub type BytesRef = Rc<RefCell<BytesBuf>>;
 
@@ -142,9 +138,9 @@ impl Value {
         Value::List(Rc::new(RefCell::new(items)))
     }
 
-    /// Fresh, unlent compact byte buffer.
+    /// Fresh compact byte buffer.
     pub fn bytes(data: Vec<u8>) -> Value {
-        Value::Bytes(Rc::new(RefCell::new(BytesBuf { data, lent: false })))
+        Value::Bytes(Rc::new(RefCell::new(BytesBuf { data })))
     }
 
     /// Extract a `[]byte` element from a checker-approved slot: either the
@@ -177,8 +173,25 @@ impl Value {
             return None;
         }
         Some(match self {
-            Value::Int(a) => matches!(other, Value::Int(b) if a == b),
-            Value::Byte(a) => matches!(other, Value::Byte(b) if a == b),
+            // Byte and Int cross-compare numerically: the checker admits a
+            // (Byte, Int) pair wherever an in-range int literal is
+            // assignable to a byte-typed slot (spec 5.10), and unlike a
+            // local's static type, a literal always evaluates to
+            // Value::Int regardless of which side of the comparison it's
+            // on. binop's (Eq, Byte, Int) arm (interp.rs) already widens
+            // the same way for `==`; this is the same rule for eq_value's
+            // callers (list contains, struct/list-of-struct equality, map
+            // keys), which don't go through binop at all.
+            Value::Int(a) => match other {
+                Value::Int(b) => a == b,
+                Value::Byte(b) => *a == *b as i64,
+                _ => false,
+            },
+            Value::Byte(a) => match other {
+                Value::Byte(b) => a == b,
+                Value::Int(b) => *a as i64 == *b,
+                _ => false,
+            },
             Value::Float(a) => matches!(other, Value::Float(b) if a == b),
             Value::Bool(a) => matches!(other, Value::Bool(b) if a == b),
             Value::Str(a) => matches!(other, Value::Str(b) if a == b),

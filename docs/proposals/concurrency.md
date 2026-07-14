@@ -89,7 +89,13 @@ drafts that are not yet decisions and may never become one.
   parallel design must give lent buffers the same answer as shared lists,
   and they are observable from foreign code, so "don't" is even weaker
   here.
-- 2026-07-13, bytes design: the lent flag (buffers that ever crossed the
-  bridge stop growing in place) is the seam a future synchronization or
-  freeze-on-share story hooks into; it already distinguishes private
-  buffers from shared ones at runtime.
+- 2026-07-14, bytes fix round: the lent flag from the 2026-07-13 bytes
+  design (buffers that ever crossed the bridge stop growing in place) is
+  gone — its only reason to exist, `append`'s in-place-growth fast path,
+  was itself removed for breaking `append`'s purity contract (no
+  refcount threshold can tell "the caller is about to rebind this name" from
+  "the caller is keeping this name and binding the result elsewhere";
+  `[]byte` append now always copies, like every other `[]T`). Task 7's
+  buffer-protocol bridge crossing no longer has a private/shared
+  distinction to lean on; whichever future synchronization or
+  freeze-on-share story lands still needs its own seam, not this one.

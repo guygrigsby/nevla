@@ -8,10 +8,11 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
   (docs/specs/2026-07-13-bytes-design.md), implementation next. byte
   scalar (compare-only, no arithmetic) plus `[]byte` as a compact list
   type; always-view zero-copy bridge crossing via the buffer protocol
-  (stable addresses by construction, the lent flag); chunked file
-  handles. Sets the bridge model for real data: values copy, primitive
-  buffers cross by reference, containers copy (lazy proxies are the
-  recorded upgrade), py handles unchanged.
+  (stable addresses by construction: `append` always copies rather than
+  mutating in place, ADR 0022, so a lent buffer's memory never moves);
+  chunked file handles. Sets the bridge model for real data: values copy,
+  primitive buffers cross by reference, containers copy (lazy proxies are
+  the recorded upgrade), py handles unchanged.
 - Compact numeric buffers `[]float64`/`[]int64` (2026-07-13): the byte
   design is written to be the template (data prep building tensors
   nevla-side, `np.frombuffer` zero-copy). Build when a data-prep flow
