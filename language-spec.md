@@ -2164,8 +2164,9 @@ append-mode handle in v1.
 - `file.create(path str) (File, error?)` — create or truncate, open
   for writing.
 - `f.read(n int) ([]byte, error?)` — read up to `n` bytes from the
-  handle's current position. EOF is `([]byte{}, none)`, not an error
-  value. Reading a closed handle is an error value, not a fault.
+  handle's current position; negative `n` is treated as 0 (an empty
+  read, no error). EOF is `([]byte{}, none)`, not an error value.
+  Reading a closed handle is an error value, not a fault.
 - `f.write(b []byte) error?` — write `b` to the handle. Writing a
   closed handle is an error value, not a fault.
 - `f.close() error?` — close the handle. Idempotent: closing an

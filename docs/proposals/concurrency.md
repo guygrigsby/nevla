@@ -99,3 +99,11 @@ drafts that are not yet decisions and may never become one.
   buffer-protocol bridge crossing no longer has a private/shared
   distinction to lean on; whichever future synchronization or
   freeze-on-share story lands still needs its own seam, not this one.
+- 2026-07-14, file handles (task 6, spec 15.3): `File` joins Proc and
+  Ctx as an Arc-backed opaque handle with a Mutex'd interior
+  (`Mutex<Option<fs::File>>`; Arc+Mutex where ordinary values are
+  Rc+RefCell). Single-threaded today, so the lock never contends; the
+  shape means a handle can cross whatever task boundary the eventual
+  concurrency model draws without changing the user-visible type. Same
+  wrappability constraint as Proc's blocking reads: `f.read(n)` is a
+  blocking pull a channel or select design must be able to absorb.
