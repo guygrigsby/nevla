@@ -1222,6 +1222,16 @@ impl<'p> Interp<'p> {
             (Mul, Float(a), Float(b)) => Float(a * b),
             (Div, Float(a), Float(b)) => Float(a / b),
             (Add, Str(a), Str(b)) => Str(format!("{a}{b}")),
+            // a Byte compared against a bare Int: only reachable when the
+            // checker approved it (spec 5.10's literal implicit, section
+            // 7.9.2/7.9.3), since an int literal always evaluates to
+            // Value::Int regardless of the byte-typed slot on the other
+            // side (interp.rs has no static-type table for locals to
+            // coerce against). Compare by numeric value either way.
+            (Eq, Byte(a), Int(b)) => Bool(*a as i64 == *b),
+            (Eq, Int(a), Byte(b)) => Bool(*a == *b as i64),
+            (NotEq, Byte(a), Int(b)) => Bool(*a as i64 != *b),
+            (NotEq, Int(a), Byte(b)) => Bool(*a != *b as i64),
             (Eq, a, b) => match a.eq_value(b, 0) {
                 Some(eq) => Bool(eq),
                 None => return Result::Err(self.fault("value too deep or cyclic")),
@@ -1238,6 +1248,14 @@ impl<'p> Interp<'p> {
             (LtEq, Byte(a), Byte(b)) => Bool(a <= b),
             (Gt, Byte(a), Byte(b)) => Bool(a > b),
             (GtEq, Byte(a), Byte(b)) => Bool(a >= b),
+            (Lt, Byte(a), Int(b)) => Bool((*a as i64) < *b),
+            (Lt, Int(a), Byte(b)) => Bool(*a < (*b as i64)),
+            (LtEq, Byte(a), Int(b)) => Bool((*a as i64) <= *b),
+            (LtEq, Int(a), Byte(b)) => Bool(*a <= (*b as i64)),
+            (Gt, Byte(a), Int(b)) => Bool((*a as i64) > *b),
+            (Gt, Int(a), Byte(b)) => Bool(*a > (*b as i64)),
+            (GtEq, Byte(a), Int(b)) => Bool((*a as i64) >= *b),
+            (GtEq, Int(a), Byte(b)) => Bool(*a >= (*b as i64)),
             (Lt, Float(a), Float(b)) => Bool(a < b),
             (LtEq, Float(a), Float(b)) => Bool(a <= b),
             (Gt, Float(a), Float(b)) => Bool(a > b),

@@ -101,7 +101,7 @@ impl Checker {
                     let t = self.expr_one(it, Some(&elem));
                     if elem == Type::Unknown {
                         elem = t;
-                    } else if !elem.accepts(&t) {
+                    } else if !self.expects(&elem, &t, Some(it), it.span) {
                         self.diag(it.span, format!("expected {elem}, got {t}"));
                     }
                 }
@@ -111,7 +111,7 @@ impl Checker {
                 let et = self.resolve(elem, span);
                 for it in items {
                     let t = self.expr_one(it, Some(&et));
-                    if !et.accepts(&t) {
+                    if !self.expects(&et, &t, Some(it), it.span) {
                         self.diag(it.span, format!("expected {et}, got {t}"));
                     }
                 }
@@ -122,11 +122,11 @@ impl Checker {
                 let vt = self.resolve(val, span);
                 for (k, v) in entries {
                     let got_k = self.expr_one(k, Some(&kt));
-                    if !kt.accepts(&got_k) {
+                    if !self.expects(&kt, &got_k, Some(k), k.span) {
                         self.diag(k.span, format!("expected {kt}, got {got_k}"));
                     }
                     let got_v = self.expr_one(v, Some(&vt));
-                    if !vt.accepts(&got_v) {
+                    if !self.expects(&vt, &got_v, Some(v), v.span) {
                         self.diag(v.span, format!("expected {vt}, got {got_v}"));
                     }
                 }
@@ -174,7 +174,7 @@ impl Checker {
                     match fields.iter().find(|(n, _)| n == fname) {
                         Some((_, v)) => {
                             let t = self.expr_one(v, Some(fty));
-                            if !fty.accepts(&t) {
+                            if !self.expects(fty, &t, Some(v), v.span) {
                                 self.diag(v.span, format!("expected {fty}, got {t}"));
                             }
                         }
@@ -257,7 +257,7 @@ impl Checker {
                     }
                     Type::Map(k, v) => {
                         let it = self.expr_one(idx, Some(&k));
-                        if !k.accepts(&it) {
+                        if !self.expects(&k, &it, Some(idx), idx.span) {
                             self.diag(idx.span, format!("expected {k}, got {it}"));
                         }
                         one(Type::Opt(v))
@@ -366,6 +366,51 @@ impl Checker {
         }
     }
 
+    /// accepts() plus the one byte implicit: an integer literal in 0..=255
+    /// is assignable to byte (design 2026-07-13); out of range is its own
+    /// diagnostic. Every checker site with the argument Expr in hand routes
+    /// through this instead of accepts().
+    pub(super) fn expects(
+        &mut self,
+        want: &Type,
+        got: &Type,
+        arg: Option<&Expr>,
+        span: Span,
+    ) -> bool {
+        if *want == Type::Byte && *got == Type::Int {
+            if let Some(e) = arg {
+                if let ExprKind::Int(n) = e.kind {
+                    if (0..=255).contains(&n) {
+                        return true;
+                    }
+                    self.diag(span, format!("cannot use {n} as byte (out of 0..255)"));
+                    return true; // diagnosed here; suppress the generic mismatch
+                }
+            }
+        }
+        want.accepts(got)
+    }
+
+    /// A Byte operand and an in-range Int literal on the other side compare
+    /// (spec 5.10's implicit reaches comparison operators too, section
+    /// 7.9.2/7.9.3): routes through expects() so the chokepoint is the same
+    /// one every other site uses, and an out-of-range literal is diagnosed
+    /// exactly once.
+    fn byte_literal_operand(
+        &mut self,
+        lt: &Type,
+        rt: &Type,
+        lhs: &Expr,
+        rhs: &Expr,
+        span: Span,
+    ) -> bool {
+        match (lt, rt) {
+            (Type::Byte, Type::Int) => self.expects(&Type::Byte, rt, Some(rhs), span),
+            (Type::Int, Type::Byte) => self.expects(&Type::Byte, lt, Some(lhs), span),
+            _ => false,
+        }
+    }
+
     fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, span: Span) -> Type {
         let lt = self.expr_pyish(lhs, None);
         let rt = self.expr_pyish(rhs, Some(&lt));
@@ -429,7 +474,7 @@ impl Checker {
                             | (Type::Byte, Type::Byte)
                             | (Type::Float, Type::Float)
                             | (Type::Str, Type::Str)
-                    );
+                    ) || self.byte_literal_operand(&lt, &rt, lhs, rhs, span);
                     if !ok {
                         self.diag(span, format!("cannot compare {lt} and {rt}"));
                     }
@@ -445,10 +490,11 @@ impl Checker {
                         self.diag(span, "none only compares to option types");
                     }
                 } else if !unknown {
-                    let comparable = matches!(
+                    let comparable = (matches!(
                         &lt,
                         Type::Int | Type::Byte | Type::Float | Type::Str | Type::Bool
-                    ) && lt == rt;
+                    ) && lt == rt)
+                        || self.byte_literal_operand(&lt, &rt, lhs, rhs, span);
                     if !comparable {
                         self.diag(span, format!("cannot compare {lt} and {rt}"));
                     }
@@ -509,7 +555,7 @@ impl Checker {
                             Type::List(elem) => {
                                 for a in &args[1..] {
                                     let t = self.expr_one(a, Some(&elem));
-                                    if !elem.accepts(&t) {
+                                    if !self.expects(&elem, &t, Some(a), a.span) {
                                         self.diag(a.span, format!("expected {elem}, got {t}"));
                                     }
                                 }
@@ -683,7 +729,7 @@ impl Checker {
         }
         for (p, a) in params.iter().zip(args) {
             let t = self.expr_one(a, Some(p));
-            if !p.accepts(&t) {
+            if !self.expects(p, &t, Some(a), a.span) {
                 self.diag(a.span, format!("expected {p}, got {t}"));
             }
         }

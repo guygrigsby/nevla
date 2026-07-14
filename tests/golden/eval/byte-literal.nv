@@ -1,0 +1,16 @@
+struct Header { kind byte }
+
+fn take(b byte) byte {
+    return b
+}
+
+fn main() {
+    b := byte(0)
+    b = 200
+    print(int(b))              // 200
+    print(b == 200)            // true
+    print(b < 255)             // true
+    h := Header{kind: 3}
+    print(int(h.kind))         // 3
+    print(int(take(9)))        // 9
+}

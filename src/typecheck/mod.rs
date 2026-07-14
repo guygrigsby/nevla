@@ -486,7 +486,7 @@ impl Checker {
                     }
                 };
                 let val = self.expr_one(expr, Some(&target_ty));
-                if !target_ty.accepts(&val) {
+                if !self.expects(&target_ty, &val, Some(expr), span) {
                     self.diag(span, format!("expected {target_ty}, got {val}"));
                 }
                 false
@@ -538,7 +538,7 @@ impl Checker {
                 } else {
                     for (e, w) in exprs.iter().zip(&want) {
                         let t = self.expr_one(e, Some(w));
-                        if !w.accepts(&t) {
+                        if !self.expects(w, &t, Some(e), e.span) {
                             self.diag(e.span, format!("expected {w}, got {t}"));
                         }
                     }

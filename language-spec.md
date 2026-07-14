@@ -446,6 +446,13 @@ The literal `none` is assignable to every option type. An empty list literal
 `[]` is assignable to every list type, but only in a context that supplies
 the list type (section 7.2.1).
 
+An integer literal in the range 0 to 255 is additionally assignable to
+`byte`: `[]byte{137, 80}`, `b = 255`, `x == 137` all work bare. An
+out-of-range integer literal in a `byte` position is a compile-time error
+("cannot use `n` as byte"). This is the only implicit conversion in the
+language; a variable of type `int` is never assignable to `byte` without an
+explicit `byte(...)` conversion (section 7.7).
+
 ### 5.11 Zero values
 
 Every type has a zero value, used to fill the non-error result slots when a
@@ -1009,8 +1016,9 @@ Unary `-` requires `int` or `float`; unary `!` requires `bool`.
 
 `<`, `<=`, `>`, `>=` are defined on `int` with `int`, `byte` with `byte`,
 `float` with `float`, and `str` with `str` (lexicographic by character
-number). The result is `bool`. `byte` and `int` never mix; widen with
-`int(b)` to compare across the two.
+number). The result is `bool`. `byte` and `int` never mix, except that an
+integer literal in 0 to 255 compares directly against a `byte` operand
+(section 5.10); otherwise widen with `int(b)` to compare across the two.
 All other operand combinations are compile-time errors. Because comparisons
 are left associative and yield `bool`, a chained comparison such as
 `a < b < c` parses but is rejected by the type checker.
@@ -1020,8 +1028,9 @@ are left associative and yield `bool`, a chained comparison such as
 `==` and `!=` yield `bool` and are defined in exactly two shapes:
 
 - Scalar equality: both operands have the same type, which must be `int`,
-  `byte`, `float`, `bool`, or `str`. Float equality follows IEEE 754 (NaN
-  is not equal to itself).
+  `byte`, `float`, `bool`, or `str` — except that a `byte` operand compares
+  directly against an integer literal in 0 to 255 (section 5.10). Float
+  equality follows IEEE 754 (NaN is not equal to itself).
 - None comparison: one operand is the literal `none` and the other has an
   option type. `x == none` is true iff `x` is absent. Comparing `none`
   against a non-option operand is a compile-time error
