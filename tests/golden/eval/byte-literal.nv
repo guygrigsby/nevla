@@ -15,4 +15,7 @@ fn main() {
     h := Header{kind: 3}
     print(int(h.kind))         // 3
     print(int(take(9)))        // 9
+    c := byte(200)
+    print(c < 255)             // true
+    print(200 == c)            // true
 }
