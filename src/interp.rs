@@ -544,6 +544,10 @@ impl<'p> Interp<'p> {
                     let items = items.clone();
                     return self.list_range(names, &items, body);
                 }
+                if let Value::Bytes(buf) = &it {
+                    let buf = buf.clone();
+                    return self.bytes_range(names, &buf, body);
+                }
                 if let Value::Map(m) = &it {
                     let m = m.clone();
                     return self.map_range(names, &m, body);
@@ -620,6 +624,37 @@ impl<'p> Interp<'p> {
             };
             self.scopes.push(HashMap::new());
             for (name, val) in names.iter().zip([Value::Int(i as i64), v]) {
+                if name != "_" {
+                    self.bind(name.clone(), val)?;
+                }
+            }
+            let flow = self.exec_block_no_scope(body);
+            self.scopes.pop();
+            match flow? {
+                Flow::Normal | Flow::Continue => {}
+                Flow::Break => break,
+                r @ Flow::Return(_) => return Ok(r),
+            }
+        }
+        Ok(Flow::Normal)
+    }
+
+    /// `for range` over a `[]byte`: same fixed-length-at-entry rule as
+    /// `list_range`, binding `Value::Byte` elements read per index.
+    #[inline(never)]
+    fn bytes_range(
+        &mut self,
+        names: &[String],
+        buf: &crate::value::BytesRef,
+        body: &Block,
+    ) -> Result<Flow, Fault> {
+        let n = buf.borrow().data.len();
+        for i in 0..n {
+            let Some(b) = buf.borrow().data.get(i).copied() else {
+                break;
+            };
+            self.scopes.push(HashMap::new());
+            for (name, val) in names.iter().zip([Value::Int(i as i64), Value::Byte(b)]) {
                 if name != "_" {
                     self.bind(name.clone(), val)?;
                 }
@@ -784,6 +819,10 @@ impl<'p> Interp<'p> {
                         let items = items.clone();
                         return assign_list(&items, steps, v);
                     }
+                    Value::Bytes(buf) => {
+                        let buf = buf.clone();
+                        return assign_bytes(&buf, steps, v);
+                    }
                     Value::Map(m) => {
                         let m = m.clone();
                         return assign_map(&m, steps, v);
@@ -834,6 +873,36 @@ impl<'p> Interp<'p> {
                 return Ok(());
             }
             assign_into(&mut b[i as usize], steps.collect(), v)
+        }
+        fn assign_bytes(
+            buf: &crate::value::BytesRef,
+            mut steps: std::iter::Peekable<std::vec::IntoIter<Step>>,
+            v: Value,
+        ) -> Result<(), String> {
+            let idx = match steps.next() {
+                Some(Step::Idx(idx)) => idx,
+                Some(Step::Field(_)) => return Err("cannot assign field here".into()),
+                None => return Err("internal: assignment path underflow".into()),
+            };
+            let i = match idx {
+                Value::Int(i) => i,
+                _ => return Err("index must be int".into()),
+            };
+            let Ok(mut b) = buf.try_borrow_mut() else {
+                return Err("assignment path aliases itself".into());
+            };
+            let len = b.data.len() as i64;
+            if i < 0 || i >= len {
+                return Err(format!("index out of bounds: {i} of {len}"));
+            }
+            if steps.peek().is_some() {
+                return Err("cannot index a byte value".into());
+            }
+            let Some(byte) = v.as_byte_elem() else {
+                return Err("byte assignment needs a byte value".into());
+            };
+            b.data[i as usize] = byte;
+            Ok(())
         }
         fn assign_map(
             m: &crate::value::MapRef,
@@ -932,12 +1001,32 @@ impl<'p> Interp<'p> {
                 }
                 Err(self.fault(format!("undefined: {n}")))
             }
-            K::List(items) | K::ListLit { items, .. } => {
+            K::List(items) => {
                 let mut out = vec![];
                 for it in items {
                     out.push(val!(self.eval(it)));
                 }
                 ok(Value::list(out))
+            }
+            K::ListLit { elem, items } => {
+                let mut out = vec![];
+                for it in items {
+                    out.push(val!(self.eval(it)));
+                }
+                // `[]byte{...}` builds the compact buffer; every other
+                // `[]T{...}` keeps the boxed list representation.
+                if matches!(elem, TypeExpr::Named(n) if n == "byte") {
+                    let mut data = Vec::with_capacity(out.len());
+                    for v in out {
+                        let Some(b) = v.as_byte_elem() else {
+                            return Err(self.fault("byte list literal needs byte values"));
+                        };
+                        data.push(b);
+                    }
+                    ok(Value::bytes(data))
+                } else {
+                    ok(Value::list(out))
+                }
             }
             K::MapLit { entries, .. } => {
                 let mut m = IndexMap::new();
@@ -1199,6 +1288,13 @@ impl<'p> Interp<'p> {
                 out.extend(b.borrow().iter().cloned());
                 return Ok(Value::list(out));
             }
+            (Add, Bytes(a), Bytes(b)) => {
+                // same concat rule as List (the checker's List(_)+List(_)
+                // arm accepts []byte+[]byte too; keep runtime parity)
+                let mut out = a.borrow().data.clone();
+                out.extend(b.borrow().data.iter());
+                return Ok(Value::bytes(out));
+            }
             (_, l, r) => (l, r),
         };
         let v = match (op, &l, &r) {
@@ -1313,6 +1409,14 @@ impl<'p> Interp<'p> {
                 }
                 Ok(items[i as usize].clone())
             }
+            (Value::Bytes(b), Value::Int(i)) => {
+                let b = b.borrow();
+                let len = b.data.len() as i64;
+                if i < 0 || i >= len {
+                    return Err(self.fault(format!("index out of bounds: {i} of {len}")));
+                }
+                Ok(Value::Byte(b.data[i as usize]))
+            }
             (Value::Str(s), Value::Int(i)) => {
                 if i < 0 {
                     return Err(
@@ -1349,6 +1453,14 @@ impl<'p> Interp<'p> {
                     return Err(self.fault(format!("slice out of bounds: {a}:{b} of {len}")));
                 }
                 Ok(Value::list(items[a as usize..b as usize].to_vec()))
+            }
+            Value::Bytes(buf) => {
+                let buf = buf.borrow();
+                let len = buf.data.len() as i64;
+                if a < 0 || b < a || b > len {
+                    return Err(self.fault(format!("slice out of bounds: {a}:{b} of {len}")));
+                }
+                Ok(Value::bytes(buf.data[a as usize..b as usize].to_vec()))
             }
             Value::Str(s) => {
                 let chars: Vec<char> = s.chars().collect();
@@ -1419,7 +1531,10 @@ impl<'p> Interp<'p> {
                     }
                 },
             },
-            TypeExpr::List(_) => Value::list(vec![]),
+            TypeExpr::List(inner) => match &**inner {
+                TypeExpr::Named(n) if n == "byte" => Value::bytes(vec![]),
+                _ => Value::list(vec![]),
+            },
             TypeExpr::Map(..) => Value::map(IndexMap::new()),
             TypeExpr::Opt(_) => Value::NoneV,
             TypeExpr::Fn(..) => Value::Fn(FnRef::Zero),

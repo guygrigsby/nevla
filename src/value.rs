@@ -10,6 +10,18 @@ pub type ListRef = Rc<RefCell<Vec<Value>>>;
 /// Shared map storage: maps are reference types (ADR 0010).
 pub type MapRef = Rc<RefCell<IndexMap<MapKey, Value>>>;
 
+/// Compact `[]byte` storage: a contiguous `Vec<u8>` instead of a boxed
+/// `Vec<Value>` (design 2026-07-13). Reference type, like `List`.
+#[derive(Debug)]
+pub struct BytesBuf {
+    pub data: Vec<u8>,
+    /// Set on first bridge crossing (Task 7); a lent buffer never grows in
+    /// place again, keeping its address stable for as long as Python holds
+    /// a view. Never cleared.
+    pub lent: bool,
+}
+pub type BytesRef = Rc<RefCell<BytesBuf>>;
+
 /// Recursion budget for deep walks over values (render, structural
 /// compare, bridge conversion). Aliasing makes cyclic values
 /// constructible; the cap turns a would-be hang into a fault or a
@@ -31,6 +43,11 @@ pub enum Value {
     /// Reference type: assignment, argument passing, and capture alias
     /// the one underlying list. Insertion order is language-visible.
     List(ListRef),
+    /// Reference type: the compact `[]byte` buffer (design 2026-07-13).
+    /// Every list rule applies (aliasing, index-assign, pure append, clone
+    /// one-level, slices copy); the runtime storage is a plain `Vec<u8>`
+    /// instead of a boxed `Vec<Value>`.
+    Bytes(BytesRef),
     /// Reference type, like List. Insertion order is language-visible.
     Map(MapRef),
     /// Field order is declaration order, also language-visible.
@@ -125,6 +142,25 @@ impl Value {
         Value::List(Rc::new(RefCell::new(items)))
     }
 
+    /// Fresh, unlent compact byte buffer.
+    pub fn bytes(data: Vec<u8>) -> Value {
+        Value::Bytes(Rc::new(RefCell::new(BytesBuf { data, lent: false })))
+    }
+
+    /// Extract a `[]byte` element from a checker-approved slot: either the
+    /// canonical `Value::Byte`, or `Value::Int` from the literal rule (spec
+    /// 5.10) — a bare int literal in byte position always evaluates as Int,
+    /// since `eval()` has no expected-type context to coerce against. Out
+    /// of range is only reachable from the unchecked repl; `None` there,
+    /// never a truncating cast.
+    pub fn as_byte_elem(&self) -> Option<u8> {
+        match self {
+            Value::Byte(b) => Some(*b),
+            Value::Int(n) => u8::try_from(*n).ok(),
+            _ => None,
+        }
+    }
+
     pub fn map(m: IndexMap<MapKey, Value>) -> Value {
         Value::Map(Rc::new(RefCell::new(m)))
     }
@@ -149,6 +185,13 @@ impl Value {
             Value::NoneV => matches!(other, Value::NoneV),
             Value::List(a) => match other {
                 Value::List(b) => Rc::ptr_eq(a, b) || eq_seq(&a.borrow(), &b.borrow(), depth + 1)?,
+                _ => false,
+            },
+            // The checker forbids `==` on []byte (design 2026-07-13), but
+            // `contains` and struct/list-of-struct equality still reach
+            // this arm through eq_value directly.
+            Value::Bytes(a) => match other {
+                Value::Bytes(b) => Rc::ptr_eq(a, b) || a.borrow().data == b.borrow().data,
                 _ => false,
             },
             Value::Tuple(a) => match other {
@@ -251,6 +294,16 @@ fn render_depth(v: &Value, depth: u32) -> String {
         Value::Str(s) => s.clone(),
         Value::List(items) => {
             let inner = items.borrow().iter().map(r).collect::<Vec<_>>().join(", ");
+            format!("[{inner}]")
+        }
+        Value::Bytes(b) => {
+            let inner = b
+                .borrow()
+                .data
+                .iter()
+                .map(u8::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
             format!("[{inner}]")
         }
         Value::Map(m) => {

@@ -1,0 +1,4 @@
+fn main() {
+    b := []byte{1, 2}
+    print(int(b[5]))
+}

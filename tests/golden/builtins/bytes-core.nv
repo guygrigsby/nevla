@@ -1,0 +1,33 @@
+fn produceBoom() ([]byte, error?) {
+    return []byte{}, error.new("boom")
+}
+
+fn zeroBytes() ([]byte, error?) {
+    v := check produceBoom()
+    return v, none
+}
+
+fn main() {
+    b := []byte{137, 80, 78, 71}
+    print(len(b))                    // 4
+    print(int(b[0]))                 // 137
+    b[0] = 1
+    print(int(b[0]))                 // 1
+    b = append(b, 255)
+    print(len(b))                    // 5
+    s := b[1:3]
+    print(s)                         // [80, 78]
+    total := 0
+    for _, x := range b {
+        total = total + int(x)
+    }
+    print(total)                     // 1 + 80 + 78 + 71 + 255 = 485
+    print(b.contains(byte(78)))      // true
+    print(b.contains(78))            // true: bare int literal argument (spec 5.10)
+    print([]byte{3, 1, 2}.sorted())  // [1, 2, 3]
+    c := []byte{1, 2} + []byte{3, 4}
+    print(c)                         // [1, 2, 3, 4]: list concat still applies
+    z, _ := zeroBytes()
+    print(len(z))                    // 0: zero value via check propagation
+    print(b)                         // [1, 80, 78, 71, 255]
+}

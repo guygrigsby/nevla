@@ -170,7 +170,7 @@ impl Checker {
             }
             (List(elem), "sorted") => {
                 self.check_args(&[], args, span);
-                if !matches!(**elem, Int | Float | Str | Unknown) {
+                if !matches!(**elem, Int | Byte | Float | Str | Unknown) {
                     self.diag(
                         span,
                         format!("sorted needs comparable elements, got {recv}"),

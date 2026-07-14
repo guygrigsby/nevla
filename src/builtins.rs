@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::ast::TypeExpr;
 use crate::interp::{Fault, Interp};
 use crate::value::{render, ErrVal, Value};
@@ -26,8 +29,9 @@ impl Interp<'_> {
             "len" => match args.first() {
                 Some(Value::Str(s)) => Ok(Value::Int(s.chars().count() as i64)),
                 Some(Value::List(v)) => Ok(Value::Int(v.borrow().len() as i64)),
+                Some(Value::Bytes(b)) => Ok(Value::Int(b.borrow().data.len() as i64)),
                 Some(Value::Map(m)) => Ok(Value::Int(m.borrow().len() as i64)),
-                _ => Err(self.fault("len needs str, list, or map")),
+                _ => Err(self.fault("len needs str, list, []byte, or map")),
             },
             "append" => {
                 // pure, Go's contract: a fresh list; growth is visible to
@@ -39,15 +43,51 @@ impl Interp<'_> {
                         out.extend(it);
                         Ok(Value::list(out))
                     }
-                    _ => Err(self.fault("append needs a list first argument")),
+                    Some(Value::Bytes(buf)) => {
+                        let Some(elem) = it.next().and_then(|v| v.as_byte_elem()) else {
+                            return Err(self.fault("append needs a byte element"));
+                        };
+                        // Growth rule (design 2026-07-13): a solely owned,
+                        // never-lent buffer grows in place (amortized O(1),
+                        // the shard-building case); anything else copies.
+                        // `strong_count <= 2` rather than `== 1`: the call
+                        // convention clones the argument's Rc into `vals`
+                        // before this function runs (eval(Ident) borrows and
+                        // clones the cell), so `b = append(b, x)` — the
+                        // idiom the growth rule exists for — always shows
+                        // strong_count 2 (the cell + this temporary), never
+                        // 1. `<= 2` still refuses to grow the moment a
+                        // second real alias exists: any additional binding,
+                        // capture, or container reference pushes the count
+                        // to 3+ before this check runs, so it falls through
+                        // to the copy path exactly when in-place growth
+                        // would be observable elsewhere. Verified
+                        // empirically (task-3-report.md): a `for` loop of
+                        // appends reuses one allocation as long as `b` is
+                        // the sole binding, and copies the instant an alias
+                        // exists.
+                        if Rc::strong_count(&buf) <= 2 && !buf.borrow().lent {
+                            buf.borrow_mut().data.push(elem);
+                            Ok(Value::Bytes(buf))
+                        } else {
+                            let mut data = buf.borrow().data.clone();
+                            data.push(elem);
+                            Ok(Value::bytes(data))
+                        }
+                    }
+                    _ => Err(self.fault("append needs a list or []byte first argument")),
                 }
             }
             "clone" => {
                 let mut it = args.into_iter();
                 match it.next() {
                     Some(Value::List(items)) => Ok(Value::list(items.borrow().clone())),
+                    Some(Value::Bytes(b)) => Ok(Value::bytes(b.borrow().data.clone())),
                     Some(Value::Map(m)) => Ok(Value::map(m.borrow().clone())),
-                    _ => Err(self.fault("clone needs a list or map (value types already copy)")),
+                    _ => {
+                        Err(self
+                            .fault("clone needs a list, []byte, or map (value types already copy)"))
+                    }
                 }
             }
             "charcode" => match args.first() {
@@ -87,7 +127,10 @@ impl Interp<'_> {
         };
         let name = match target {
             TypeExpr::Named(n) => n.as_str(),
-            TypeExpr::List(_) => "list",
+            TypeExpr::List(inner) => match &**inner {
+                TypeExpr::Named(n) if n == "byte" => "bytes",
+                _ => "list",
+            },
             _ => return Err(self.fault("bad conversion target")),
         };
         // py extraction goes through the bridge
@@ -156,6 +199,7 @@ impl Interp<'_> {
                 Err(e) => Err(self.fault(format!("py conversion: {}", e.msg))),
             },
             ("list", Value::List(items)) => Ok(Value::List(items)),
+            ("bytes", Value::Bytes(b)) => Ok(Value::Bytes(b)),
             // py conversions land with the bridge
             (t, v) => fail(
                 self,
@@ -177,6 +221,7 @@ impl Interp<'_> {
             Value::Re(re) => crate::stdlib::regex::method(self, &re, name, args),
             Value::Proc(p) => crate::stdlib::proc::method(self, &p, name, args),
             Value::List(items) => self.list_method(items, name, args),
+            Value::Bytes(buf) => self.bytes_method(buf, name, args),
             Value::Str(s) => self.str_method(&s, name, args),
             Value::Map(m) => {
                 let arg = args.pop();
@@ -277,6 +322,7 @@ impl Interp<'_> {
                     use std::cmp::Ordering;
                     match (a, b) {
                         (Value::Int(x), Value::Int(y)) => x.cmp(y),
+                        (Value::Byte(x), Value::Byte(y)) => x.cmp(y),
                         (Value::Float(x), Value::Float(y)) => {
                             x.partial_cmp(y).unwrap_or(Ordering::Equal)
                         }
@@ -339,6 +385,54 @@ impl Interp<'_> {
                 Ok(Value::Str(parts.join(&sep)))
             }
             _ => Err(self.fault(format!("list has no method {name}"))),
+        }
+    }
+
+    /// `[]byte` methods: materialize the buffer into a boxed `Vec<Value::Byte>`
+    /// and delegate to `list_method`. Every delegated method is pure (map,
+    /// filter, each, sorted, sorted_by, contains — `sum`/`join` are
+    /// excluded for `[]byte` by the checker), so the snapshot is correct;
+    /// nothing here observes a mutation mid-call.
+    fn bytes_method(
+        &mut self,
+        buf: crate::value::BytesRef,
+        name: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, Fault> {
+        let items: Vec<Value> = buf.borrow().data.iter().map(|b| Value::Byte(*b)).collect();
+        // An argument naming a byte element (contains' needle) arrives as
+        // Value::Int when spelled as a bare literal (spec 5.10); normalize
+        // to Value::Byte so eq_value (used by "contains") matches against
+        // the materialized Value::Byte elements. Arguments that are not
+        // byte elements (a callback fn for map/filter/each) pass through
+        // unchanged.
+        let args: Vec<Value> = args
+            .into_iter()
+            .map(|a| match a.as_byte_elem() {
+                Some(b) => Value::Byte(b),
+                None => a,
+            })
+            .collect();
+        let result = self.list_method(Rc::new(RefCell::new(items)), name, args)?;
+        match (name, result) {
+            // typed []byte by the checker: repack into the compact form
+            ("filter" | "sorted", Value::List(items)) => {
+                let items = items.borrow();
+                let mut data = Vec::with_capacity(items.len());
+                for v in items.iter() {
+                    let Some(b) = v.as_byte_elem() else {
+                        return Err(
+                            self.fault("internal: []byte method produced a non byte element")
+                        );
+                    };
+                    data.push(b);
+                }
+                Ok(Value::bytes(data))
+            }
+            // "map" changes the element type (checker-typed accordingly)
+            // and stays a boxed List; everything else (each, sorted_by,
+            // contains) returns whatever list_method already produced.
+            (_, other) => Ok(other),
         }
     }
 

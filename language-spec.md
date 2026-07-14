@@ -308,6 +308,11 @@ between `int` and `float` (section 7.9.1).
 reference types (chapter 11): assignment, argument passing, and capture
 alias the one underlying list. `clone(xs)` makes an explicit copy.
 
+`[]byte` is an ordinary list type over `byte`: every rule above applies
+verbatim. Its runtime representation is a compact contiguous buffer rather
+than a boxed sequence of values (an implementation detail, section 11.1);
+the language-visible behavior is identical to any other `[]T`.
+
 ### 5.3 Map types
 
 `map[K]V` maps keys of type `K` to values of type `V`. The key type `K`
@@ -671,6 +676,15 @@ xs := []int{}        // ok: empty, typed
 ys := []str{"a", "b"}
 ```
 
+`[]byte{e1, ..., en}` is an ordinary typed list literal with `E` = `byte`:
+each element must be assignable to `byte`, so an integer literal in
+0..255 works bare (the literal rule, section 5.10) and any other element
+needs an explicit `byte(...)` conversion.
+
+```
+b := []byte{137, 80, 78, 71}   // ok: literals assignable to byte
+```
+
 #### 7.2.2 Map literals
 
 ```
@@ -826,7 +840,9 @@ For `a[i]`:
 
 - If `a` has type `[]T`, `i` must be `int` and the result is `T`.
   Indices run from 0. An index outside `0 <= i < len(a)` is a runtime fault.
-  Negative indices are not supported.
+  Negative indices are not supported. `[]byte` indexes to `byte` under this
+  same rule; its compact runtime representation (section 11.1) does not
+  change the semantics.
 - If `a` has type `str`, `i` must be `int` and the result is a `str` holding
   the single character at position `i` (positions count characters).
   Out of range is a runtime fault.
@@ -856,6 +872,8 @@ Slice = "[" { newline } Expression ":" Expression "]" .
 The bounds must satisfy `0 <= lo <= hi <= len(a)`; anything else is a runtime
 fault. The result is a copy of the half-open range `[lo, hi)`; `a[n:n]` is
 empty. Slicing any other type, including `py`, is a compile-time error.
+`b[lo:hi]` on a `[]byte` yields a fresh `[]byte`, copying the range out of
+the compact buffer; the source buffer is unaffected.
 
 ### 7.7 Conversions
 
@@ -1279,7 +1297,8 @@ Nevla has one loop keyword with three forms, as in Go:
   | `py` | iteration index `i: int` | index `i: int`, item `x: py` |
 
   An `int` operand of `n <= 0` runs zero iterations. Lists range in element
-  order, maps in insertion order. Strings range by character: the index is
+  order, maps in insertion order; a `[]byte` operand binds `v: byte` under
+  the same `[]T` row. Strings range by character: the index is
   the character index (the same index `s[i]` uses, section 7.5) and the
   value is a one-character `str`. A `py` operand may be a py chain
   (ranging absorbs it); iteration calls Python's `iter()` once, then
@@ -1547,6 +1566,9 @@ original's.
 
 **Reference types** copy the reference; there is one underlying object:
 `[]T`, `map[K]V`, `fn`, `py` (section 5.8), and `Ctx` (section 15.4).
+`[]byte` is a `[]T` like any other (reference type, aliasing, `clone`); its
+compact contiguous-buffer representation is an implementation detail with
+no language-visible effect (design 2026-07-13).
 
 ```
 a := [1, 2, 3]
@@ -1726,6 +1748,14 @@ conversion error at compile time but produces an error value at runtime
 ("cannot pass ... to python"), flowing through the chain's error slot like
 any Python exception.
 
+`[]byte` is a temporary exception to the `[]T` row above: its compact
+buffer representation (section 11.1) does not yet have a bridge crossing
+defined, so passing a `[]byte` value to a py operation produces the
+"cannot pass ... to python" error value like any unsupported type, not a
+Python `list`. This is a placeholder pending the zero-copy buffer-protocol
+view design 2026-07-13 specifies (a later revision of this section);
+tracked in the implementation plan, not a permanent language rule.
+
 Outbound (Python object to nevla value): always explicit and fallible,
 via the conversions of section 7.7 applied to a `py` operand. Each yields
 `(T, error?)`:
@@ -1823,8 +1853,9 @@ violation is a fault (chapter 12).
 len(x) int
 ```
 
-For `str`, the number of characters; for `list`, the element count;
-for `map`, the entry count. Any other argument type is a compile-time error.
+For `str`, the number of characters; for `list` (including `[]byte`), the
+element count; for `map`, the entry count. Any other argument type is a
+compile-time error.
 
 ### 14.5 charcode
 
@@ -1860,6 +1891,13 @@ value must be assignable to its element type. Zero values yield a plain
 copy. The original list is never modified; other names bound to it see
 growth only through rebinding (chapter 11).
 
+`append` on `[]byte` observes the same contract: `xs` is never modified in
+place from the caller's perspective, and growth is visible only by
+rebinding. The reference implementation grows a buffer with no other
+outstanding reference in place as an allocation optimization (amortized
+O(1) for build-by-append loops); this is unobservable from nevla source
+and is not part of the language's semantics.
+
 ### 14.8 clone
 
 ```
@@ -1870,7 +1908,7 @@ clone(x map[K]V) map[K]V
 A one-level copy of a list or map (chapter 11): the container is new, its
 elements copy by their kinds, exactly Go's `slices.Clone`/`maps.Clone`.
 Applying `clone` to a value type is a compile-time error; value types
-already copy.
+already copy. `clone` on `[]byte` copies the underlying buffer.
 
 ### 14.9 Methods on builtin types
 
@@ -1926,13 +1964,18 @@ Receiver `[]T`.
   0; the result of summing an empty `[]float` is unspecified in v1 (the
   reference implementation yields a value that faults on later float
   use).
-- `sorted() []T` — `T` must be `int`, `float`, or `str`; a fresh
+- `sorted() []T` — `T` must be `int`, `byte`, `float`, or `str`; a fresh
   ascending list.
 - `sorted_by(before fn(T, T) bool) []T` — a sorted copy per the
   comparator; the sort is stable.
 - `contains(v T) bool` — structural membership (section 11.2).
 - `join(sep str) str` — `T` must be `str`; concatenation with the
   separator.
+
+`[]byte` (`T` = `byte`) has every method above except `sum` and `join`,
+which `byte` does not satisfy (`byte` is not `int`/`float`, and is not
+`str`); `sorted`, `sorted_by`, `contains`, `filter`, `each`, and `map`
+all apply, per the general rules above.
 
 ```nevla
 fn main() {

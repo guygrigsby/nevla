@@ -1,0 +1,9 @@
+fn main() {
+    a := []byte{1, 2, 3}
+    b := a
+    b[0] = 9
+    print(int(a[0]))         // 9: reference type, aliasing
+    c := clone(a)
+    c[1] = 7
+    print(int(a[1]))         // 2: clone detaches
+}
