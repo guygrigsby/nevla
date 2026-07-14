@@ -1,14 +1,20 @@
-// A bare untyped list literal is not assignable to []byte; only the
-// []byte{...} spelling is (fix round: this used to typecheck by smuggling
-// a boxed Value::List past the checker via the byte int-literal implicit,
-// see tests/golden/eval/bytes-str-smuggled-list-fault.nv's history and
-// docs/specs/2026-07-13-bytes-design.md's literal-rule section). []int
-// never implicitly becomes []byte, same as int never implicitly becomes
-// byte (spec 5.10).
+// A bare list literal is never []byte; only the []byte{...} spelling is
+// (spec 5.10/7.2.1; docs/specs/2026-07-13-bytes-design.md, literal rule).
+// eval builds bare literals as boxed Value::List, never the compact
+// Value::Bytes, so each of these used to smuggle a boxed list into a
+// []byte slot (str(b) faulted on it; append grew it via the generic list
+// arm). All three routes are compile errors now:
+//   - a non-empty bare literal infers []int (byte context not adopted)
+//   - an empty bare literal stays []? (the []byte <- []? carve-out)
+//   - a byte-typed first element may not self-unify a bare literal to
+//     []byte with no context at all
 fn takesBytes(b []byte) bool {
     return b.contains(byte(1))
 }
 
 fn main() {
     print(takesBytes([1, 2]))
+    print(takesBytes([]))
+    xs := [byte(1), byte(2)]
+    print(len(xs))
 }

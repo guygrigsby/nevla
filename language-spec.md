@@ -448,8 +448,9 @@ element, return slot) of type `T` when:
   error (assignability then does not produce a second error).
 
 The literal `none` is assignable to every option type. An empty list literal
-`[]` is assignable to every list type, but only in a context that supplies
-the list type (section 7.2.1).
+`[]` is assignable to every list type except `[]byte`, and only in a context
+that supplies the list type; the empty `[]byte` is spelled `[]byte{}`
+(section 7.2.1).
 
 An integer literal in the range 0 to 255 is additionally assignable to
 `byte`: `[]byte{137, 80}`, `b = 255`, `x == 137` all work bare. An
@@ -460,7 +461,8 @@ explicit `byte(...)` conversion (section 7.7). The implicit applies only at
 a position already known to be `byte` (a scalar slot, or an element of a
 `[]byte{...}` typed literal); it does not reach into a bare list literal's
 own element-type inference, so `[]int` (including a bare `[1, 2]`) is never
-assignable to `[]byte` (section 7.2.1).
+assignable to `[]byte`, and a bare list literal never has type `[]byte` at
+all (section 7.2.1).
 
 ### 5.11 Zero values
 
@@ -689,18 +691,24 @@ needs an explicit `byte(...)` conversion.
 b := []byte{137, 80, 78, 71}   // ok: literals assignable to byte
 ```
 
-The literal rule applies only to the typed form: a bare list literal's
-elements type themselves first (an integer literal types `int`), so a bare
-`[1, 2]` is `[]int` regardless of a surrounding `[]byte` context, and `[]int`
-is not assignable to `[]byte` (section 5.10). Only `[]byte{...}` builds a
-`[]byte` from integer literals; a bare `[1, 2]` passed where `[]byte` is
-expected is a compile-time error ("expected []byte, got []int").
+A bare list literal never has type `[]byte`; only the `[]byte{...}` form
+does. The literal rule applies only to the typed form: a bare list
+literal's elements type themselves first (an integer literal types `int`),
+so a bare `[1, 2]` is `[]int` regardless of a surrounding `[]byte` context,
+and `[]int` is not assignable to `[]byte` (section 5.10). A bare empty `[]`
+does not take `[]byte` from context either (`[]byte` is the one list type
+excluded from the empty-literal context rule above; write `[]byte{}`), and
+a bare literal whose first element is `byte`-typed (`[byte(1), byte(2)]`)
+is a compile-time error rather than a `[]byte`.
 
 ```
 fn takesBytes(b []byte) bool { return len(b) > 0 }
 
 takesBytes([]byte{1, 2})   // ok
-// takesBytes([1, 2])      // compile error: expected byte, got int
+takesBytes([]byte{})       // ok
+// takesBytes([1, 2])      // compile error: expected []byte, got []int
+// takesBytes([])          // compile error: expected []byte, got []?
+// xs := [byte(1)]         // compile error: bare list literal cannot be []byte
 ```
 
 #### 7.2.2 Map literals

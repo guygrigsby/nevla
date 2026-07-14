@@ -76,6 +76,13 @@ impl Type {
             (Type::Opt(inner), v) => {
                 inner.accepts(v) || matches!(v, Type::Opt(x) if inner.accepts(x))
             }
+            // []byte does not accept []? (a bare `[]`, or a list whose
+            // element type never resolved): the runtime builds bare list
+            // literals as boxed Value::List, never the compact
+            // Value::Bytes, so letting []? through hands a boxed empty
+            // list to a []byte slot where append then grows a smuggled
+            // non-compact []byte. The correct empty spelling is []byte{}.
+            (Type::List(a), Type::List(b)) if **a == Type::Byte && **b == Type::Unknown => false,
             (Type::List(a), Type::List(b)) => a.accepts(b),
             (Type::Map(ak, av), Type::Map(bk, bv)) => ak.accepts(bk) && av.accepts(bv),
             _ => false,

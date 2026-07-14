@@ -29,5 +29,9 @@ fn main() {
     print(c)                         // [1, 2, 3, 4]: list concat still applies
     z, _ := zeroBytes()
     print(len(z))                    // 0: zero value via check propagation
+    e := []byte{}
+    print(len(e))                    // 0: the empty spelling (bare [] is not []byte)
+    e = append(e, 137)
+    print(int(e[0]))                 // 137: append from empty grows the compact buffer
     print(b)                         // [1, 80, 78, 71, 255]
 }

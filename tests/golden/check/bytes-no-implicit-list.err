@@ -1,1 +1,3 @@
-expected byte, got int
+expected []byte, got []int
+expected []byte, got []?
+bare list literal cannot be []byte; write []byte{...}
