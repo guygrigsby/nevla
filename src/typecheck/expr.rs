@@ -372,8 +372,16 @@ impl Checker {
                         | (Type::Byte, Type::Byte | Type::Int)
                         | (Type::Int, Type::Byte)
                         | (Type::Str, _)
-                        | (Type::List(_), Type::List(_))
-                ) || (is_byte_list(&t) && at == Type::Str);
+                // []T(x) list pass-through, except across the byte boundary:
+                // []byte(xs) on []int and []int(b) on []byte are not v1
+                // conversions (design 2026-07-13, out of scope: a for loop
+                // covers it), and convert() has no arms for them — its
+                // catch-all would hand an error tuple to this single-valued
+                // slot (print rendered it, len faulted). []byte([]byte)
+                // identity and every non-byte pass-through stay.
+                ) || matches!((&t, &at), (Type::List(want), Type::List(got))
+                        if (**want == Type::Byte) == (**got == Type::Byte))
+                    || (is_byte_list(&t) && at == Type::Str);
                 if !ok {
                     self.diag(span, format!("cannot convert {at} to {t}"));
                 }

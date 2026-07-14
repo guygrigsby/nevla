@@ -1,0 +1,15 @@
+// []byte(xs) on []int and []int(b) on []byte are not v1 conversions
+// (bytes design 2026-07-13, out-of-scope list: a for loop covers it).
+// Before this rule the generic []T(x) list pass-through accepted both as
+// single-valued while convert() had no arms for them: its catch-all
+// returned an error TUPLE into the single-valued slot — print rendered
+// "[], error(cannot convert ...)" with exit 0, then len faulted.
+// []byte([]byte) identity and non-byte pass-throughs are unaffected.
+fn main() {
+    xs := [104, 105]
+    b := []byte(xs)
+    print(len(b))
+    c := []byte{104, 105}
+    ys := []int(c)
+    print(len(ys))
+}
