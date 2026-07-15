@@ -11,6 +11,15 @@
 // "[], error(cannot convert ...)" with exit 0, then len faulted.
 // []byte([]byte) identity and non-byte pass-throughs are unaffected at
 // every depth.
+//
+// A depth-mismatched pair crosses too: [][]byte(depthXs) on a plain
+// []int recurses past the last List on the got side straight to a
+// (List(Byte), Int) pair, which used to fall through the walk's
+// catch-all as "not a (List, List) pair, so fine" and seat each
+// Value::Int element of depthXs directly in a []byte slot one level
+// down (str(depthYss[0]) faulted). The mirror, []int(depthBss) on a
+// [][]byte, crosses from the other side the same way (task-9 review,
+// IMPORTANT 4).
 fn main() {
     xs := [104, 105]
     b := []byte(xs)
@@ -24,4 +33,10 @@ fn main() {
     dss := [][]byte{[]byte{1, 2}}
     yss := [][]int(dss)
     print(len(yss))
+    depthXs := [1, 2]
+    depthYss := [][]byte(depthXs)
+    print(len(depthYss))
+    depthBss := [][]byte{[]byte{1, 2}}
+    depthZs := []int(depthBss)
+    print(len(depthZs))
 }

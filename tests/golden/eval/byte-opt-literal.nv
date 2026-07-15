@@ -1,0 +1,14 @@
+// The byte literal implicit (spec 5.10: an int literal in 0..=255 is
+// assignable to byte) composes with option widening: a `byte?` parameter
+// accepts a bare in-range literal directly, not just `none` or an
+// explicit `byte(...)` conversion. Checker::expects unwraps one level of
+// Opt before the literal check so this falls out of the same chokepoint
+// every other byte-implicit site routes through (task-9 review, MINOR 5).
+fn take(b byte?) bool {
+    return b != none
+}
+
+fn main() {
+    print(take(5))       // true: literal widens into byte?
+    print(take(none))    // false
+}

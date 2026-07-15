@@ -1,0 +1,16 @@
+// map[byte]V.keys() and map[K]byte.values() would need to hand back a
+// compact []byte, but the runtime builds keys()/values() results as a
+// boxed Value::List of Value::Int regardless of K/V (sigs.rs types the
+// result List(k)/List(v); there is no typed repack), so a []byte-typed
+// result slot would hold a boxed list underneath -- the same
+// repack-impossible shape sum()/join() already reject on a bare []byte
+// receiver. Both are checker errors now; iterate with a for loop
+// instead (task-9 review, IMPORTANT 3; the typed repack is backlogged).
+fn main() {
+    m := map[byte]str{104: "a"}
+    ks := m.keys()
+    n := map[str]byte{"a": 104}
+    vs := n.values()
+    print(len(ks))
+    print(len(vs))
+}

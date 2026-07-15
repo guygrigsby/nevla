@@ -1,0 +1,2 @@
+keys() on map[byte]str would need []byte; iterate with for instead
+values() on map[str]byte would need []byte; iterate with for instead

@@ -2,3 +2,5 @@ cannot convert []int to []byte
 cannot convert []byte to []int
 cannot convert [][]int to [][]byte
 cannot convert [][]byte to [][]int
+cannot convert []int to [][]byte
+cannot convert [][]byte to []int

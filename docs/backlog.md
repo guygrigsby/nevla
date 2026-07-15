@@ -20,7 +20,12 @@ Not commitments, just recorded intent. Ordered roughly by expected pain.
   reference, containers copy (lazy proxies are the recorded upgrade), py
   handles unchanged. Follow-ons tracked as their own entries below:
   compact numeric buffers, fn across the bridge, binary http,
-  `file.mapbytes`, hex integer literals.
+  `file.mapbytes`, hex integer literals. `map[byte]V.keys()` and
+  `map[K]byte.values()` are checker-rejected rather than fixed (task-9
+  review, IMPORTANT 3): the runtime builds both generically as a boxed
+  `Value::List` with no typed `[]byte` repack, so a real fix needs that
+  repack built and wired per-K/V, not just a diagnostic; a `for k, v :=
+  range m` loop is the workaround until then.
 - Compact numeric buffers `[]float64`/`[]int64` (2026-07-13): the byte
   design is written to be the template (data prep building tensors
   nevla-side, `np.frombuffer` zero-copy). Build when a data-prep flow

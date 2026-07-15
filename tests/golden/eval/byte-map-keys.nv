@@ -3,6 +3,12 @@
 // literal in a byte-typed slot evaluates to Value::Int at runtime (spec
 // 5.10) while byte(n) evaluates to Value::Byte, and the checker admits
 // both spellings wherever a byte key is expected (spec 5.3).
+//
+// keys() on a map[byte]V is a checker error now (tests/golden/check/
+// bytes-map-keys-values-reject.nv|.err; task-9 review, IMPORTANT 3), so
+// the cross-spell equality it used to cover here is exercised through
+// for-range instead: the loop's key binding must compare equal against
+// both spellings the same way keys()'s result used to.
 
 fn main() {
     // literal-keyed map, byte()-spelled read
@@ -17,10 +23,12 @@ fn main() {
     print(m.has(byte(3)))    // true
     print(n.has(5))          // true
 
-    // keys() must yield a key that compares equal against both spellings,
-    // whichever runtime tag (Value::Byte or Value::Int) the key holds.
-    ks := n.keys()
-    k := ks[0]
-    print(k == byte(5))      // true
-    print(k == 5)            // true
+    // for-range binds the key at the map's declared key type (byte); it
+    // must compare equal against both spellings, whichever runtime tag
+    // (Value::Byte or Value::Int) the key happens to hold.
+    for k, v := range n {
+        print(k == byte(5))      // true
+        print(k == 5)            // true
+        print(v)                 // y
+    }
 }

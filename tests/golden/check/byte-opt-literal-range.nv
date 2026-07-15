@@ -1,0 +1,11 @@
+// The byte literal implicit reaches through one level of Opt (task-9
+// review, MINOR 5; tests/golden/eval/byte-opt-literal.nv is the accepted
+// mirror), but an out-of-range literal is still its own diagnostic, not
+// a silent pass-through into byte?'s wider option slot.
+fn take(b byte?) bool {
+    return b != none
+}
+
+fn main() {
+    print(take(300))
+}

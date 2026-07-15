@@ -417,15 +417,34 @@ impl Checker {
     /// depth: at each (List, List) level the two element types must agree
     /// on byteness, recursively — [][]byte(xss) on [][]int agrees at the
     /// top (neither element is byte) but crosses one level down, where a
-    /// boxed []int would be seated in a []byte element slot. Non-list
-    /// pairs terminate the walk: per-element validation beyond byteness
-    /// stays out of v1 (spec 7.7).
+    /// boxed []int would be seated in a []byte element slot. A depth
+    /// mismatch (one side keeps nesting in List while the other bottoms
+    /// out) also crosses if the still-list side contains byte at any
+    /// remaining depth: `[][]byte(xs)` on a `[]int` recurses to
+    /// (List(Byte), Int) — not a (List, List) pair, so the walk used to
+    /// stop and call it fine, but it seats each `Value::Int` element of
+    /// `xs` directly in a `[]byte` slot one level down, the same
+    /// smuggling the same-depth case already rejects. The mirror,
+    /// `[]int(bss)` on a `[][]byte`, crosses the same way from the other
+    /// side. Only non-list/non-list pairs terminate the walk clean:
+    /// per-element validation beyond byteness stays out of v1 (spec 7.7).
     fn conversion_crosses_byte(want: &Type, got: &Type) -> bool {
         match (want, got) {
             (Type::List(w), Type::List(g)) => {
                 (**w == Type::Byte) != (**g == Type::Byte)
                     || Self::conversion_crosses_byte(w, g)
             }
+            (Type::List(w), _) => Self::contains_byte(w),
+            (_, Type::List(g)) => Self::contains_byte(g),
+            _ => false,
+        }
+    }
+
+    /// Whether `t` is `byte` or a list nested to any depth over `byte`.
+    fn contains_byte(t: &Type) -> bool {
+        match t {
+            Type::Byte => true,
+            Type::List(inner) => Self::contains_byte(inner),
             _ => false,
         }
     }
@@ -434,6 +453,13 @@ impl Checker {
     /// is assignable to byte (design 2026-07-13); out of range is its own
     /// diagnostic. Every checker site with the argument Expr in hand routes
     /// through this instead of accepts().
+    ///
+    /// The implicit also composes with option widening (spec 5.10 says
+    /// widening applies "recursively", and the byte implicit is itself a
+    /// form of assignability): `want` of `byte?` unwraps one level before
+    /// the literal check, so `fn take(b byte?) { }` accepts `take(5)` the
+    /// same as a bare `byte` parameter would, not just `take(none)` and
+    /// `take(byte(5))`.
     pub(super) fn expects(
         &mut self,
         want: &Type,
@@ -441,7 +467,12 @@ impl Checker {
         arg: Option<&Expr>,
         span: Span,
     ) -> bool {
-        if *want == Type::Byte && *got == Type::Int {
+        let want_byte = match want {
+            Type::Byte => true,
+            Type::Opt(inner) => matches!(**inner, Type::Byte),
+            _ => false,
+        };
+        if want_byte && *got == Type::Int {
             if let Some(e) = arg {
                 if let ExprKind::Int(n) = e.kind {
                     if (0..=255).contains(&n) {

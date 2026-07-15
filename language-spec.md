@@ -2063,6 +2063,13 @@ Receiver `map[K]V`. Iteration order is insertion order (section 5.3).
 - `delete(k K)` — removes `k` in place, Go's delete; the remaining
   order is preserved.
 
+`keys()` on a `map[byte]V` and `values()` on a `map[K]byte` are
+compile-time errors: the result would need to be a compact `[]byte`, but
+the two methods build their result generically across every `K`/`V`,
+independently of byteness, and have no compact `[]byte` repack. Iterate
+with a `for k, v := range m` instead (section 8.7), which binds the byte
+key or value directly with no repack in the way.
+
 ```nevla
 fn main() {
     m := map[str]int{"b": 2, "a": 1}

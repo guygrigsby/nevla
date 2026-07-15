@@ -199,12 +199,33 @@ impl Checker {
                 self.check_args(&[Str], args, span);
                 one(Str)
             }
+            // keys()/values() type as List(k)/List(v); when that element
+            // type is byte the runtime instead builds a boxed Value::List
+            // of Value::Int (map iteration order has no compact []byte
+            // storage to hand back), so a []byte-typed slot would hold a
+            // boxed list underneath — the same repack-impossible shape
+            // sum()/join() already reject for a plain []byte receiver.
+            // Rejecting here, not fixing the runtime repack, matches that
+            // precedent; a for loop iterates map[byte]V/map[K]byte fine
+            // (task-9 review, IMPORTANT 3; the typed repack is backlogged).
             (Map(k, _), "keys") => {
                 self.check_args(&[], args, span);
+                if **k == Byte {
+                    self.diag(
+                        span,
+                        format!("keys() on {recv} would need []byte; iterate with for instead"),
+                    );
+                }
                 one(List(k.clone()))
             }
             (Map(_, v), "values") => {
                 self.check_args(&[], args, span);
+                if **v == Byte {
+                    self.diag(
+                        span,
+                        format!("values() on {recv} would need []byte; iterate with for instead"),
+                    );
+                }
                 one(List(v.clone()))
             }
             (Map(k, _), "has") => {
