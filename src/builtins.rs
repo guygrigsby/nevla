@@ -44,9 +44,6 @@ impl Interp<'_> {
                         Ok(Value::list(out))
                     }
                     Some(Value::Bytes(buf)) => {
-                        let Some(elem) = it.next().and_then(|v| v.as_byte_elem()) else {
-                            return Err(self.fault("append needs a byte element"));
-                        };
                         // Always copy, exactly like the List arm above:
                         // append is pure (spec 11.1/14.7), and the
                         // `Rc::strong_count(&buf) <= 2` in-place growth
@@ -73,8 +70,21 @@ impl Interp<'_> {
                         // read again), which this interpreter doesn't have;
                         // reverting to always-copy is correctness over an
                         // optimization that was never provably safe.
+                        //
+                        // Consume every remaining arg, like the List arm's
+                        // `out.extend(it)`: this arm used to call
+                        // `it.next()` exactly once, so `append(b, 2, 3)`
+                        // silently dropped the `3` (len 2, not 3), and
+                        // `append(b)` with zero extra args faulted instead
+                        // of returning a plain copy the way every other
+                        // list's zero-arg append does (spec 14.7).
                         let mut data = buf.borrow().data.clone();
-                        data.push(elem);
+                        for v in it {
+                            let Some(elem) = v.as_byte_elem() else {
+                                return Err(self.fault("append needs a byte element"));
+                            };
+                            data.push(elem);
+                        }
                         Ok(Value::bytes(data))
                     }
                     _ => Err(self.fault("append needs a list or []byte first argument")),

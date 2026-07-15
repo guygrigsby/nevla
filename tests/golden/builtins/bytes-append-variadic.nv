@@ -1,0 +1,28 @@
+// append(xs, v1, ..., vn) on []byte must have the same variadic contract
+// as every other []T (spec 14.7): the Bytes arm used to call it.next()
+// exactly once, so a call with more than one trailing value silently
+// dropped everything past the first (append(b, 2, 3) yielded len 2, not
+// 3), and a call with zero trailing values faulted outright instead of
+// returning a plain copy the way append(xs) does on []int (task-9
+// review, CRITICAL 1 / IMPORTANT 2). Mirrors tests/golden/eval/append.nv
+// one-for-one on []byte.
+fn main() {
+    b := []byte{1}
+    c := append(b, 2, 3)
+    print(len(c))     // 3
+    print(c)          // [1, 2, 3]
+
+    // zero values: a copy, not a fault
+    d := append(b)
+    print(d)          // [1]
+
+    // value semantics: the original is untouched by either call
+    print(b)           // [1]
+
+    // purity across rebind to a different name (not the fast-path shape
+    // that broke this before, but still asserted so a regression here
+    // shows up next to the variadic fix)
+    e := append(b, 9)
+    print(b)            // [1]
+    print(e)             // [1, 9]
+}
