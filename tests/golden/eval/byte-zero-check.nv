@@ -1,0 +1,14 @@
+// A fn returning (byte, error?) whose check propagates an error must
+// fill the byte slot with its zero value, 0 (spec 5.11), same mechanism
+// tests/golden/builtins/bytes-core.nv already proves for []byte's zero
+// value (empty list) via zeroBytes(); this is the scalar mirror.
+fn parseByte(s str) (byte, error?) {
+    n := check int(s)
+    return byte(n), none
+}
+
+fn main() {
+    b, err := parseByte("nope")
+    print(err == none)    // false
+    print(int(b))         // 0: zero value via check propagation
+}

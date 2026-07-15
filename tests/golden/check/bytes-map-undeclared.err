@@ -1,1 +1,4 @@
-lambda returning byte needs a declared return type
+bytes-map-undeclared.nv:12:16: lambda returning byte needs a declared return type
+bytes-map-undeclared.nv:14:23: lambda returning byte needs a declared return type
+bytes-map-undeclared.nv:17:17: lambda returning byte needs a declared return type
+bytes-map-undeclared.nv:19:10: lambda returning byte needs a declared return type

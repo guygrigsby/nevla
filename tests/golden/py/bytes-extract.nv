@@ -14,8 +14,13 @@ fn main() (error?) {
     print(err2 == none)      // true: bytearray extracts
     print(len(got2))         // 2
 
+    mv := check builtins.memoryview(check builtins.bytes([]byte{9, 8}))
+    got3, err3 := []byte(mv)
+    print(err3 == none)      // true: memoryview extracts, the third source
+    print(int(got3[0]))      // 9
+
     obj := check builtins.object()
-    _, err3 := []byte(obj)
-    print(err3 != none)      // true: non buffer object is an error value
+    _, err4 := []byte(obj)
+    print(err4 != none)      // true: non buffer object is an error value
     return none
 }

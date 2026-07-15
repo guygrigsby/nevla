@@ -2155,7 +2155,7 @@ fn main() {
 
 ### 15.3 file
 
-Paths are `str`. Text contents are UTF-8 `str` or raw bytes `[]byte`.
+Paths are `str`. File contents are UTF-8 `str` or raw bytes `[]byte`.
 
 - `file.read(path str) (str, error?)` — whole-file read; the value slot
   is `""` on error.
